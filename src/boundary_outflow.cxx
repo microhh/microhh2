@@ -28,8 +28,32 @@ namespace
 {
     template<typename TF>
     void compute_outflow(
-            TF* const restrict data, TF* const restrict tmp)
+            TF* const restrict a, TF* const restrict plane,
+            const int iend, const int jstart, const int jend, const int kstart, const int kend,
+            const int icells, const int jcells, const int ijcells)
     {
+        const int i = iend-1;
+        const int ii1 = 1;
+        const int ii2 = 2;
+
+        // Compute the boundary value
+        for (int k=kstart; k<kend; ++k)
+            for (int j=jstart; j<jend; ++j)
+            {
+                const int jk  = j + jcells*k;
+                const int ijk = i + j*icells + k*ijcells;
+                plane[jk] = a[ijk];
+            }
+
+        // Set the ghost cells using Dirichlet
+        for (int k=kstart; k<kend; ++k)
+            for (int j=jstart; j<jend; ++j)
+            {
+                const int jk  = j + jcells*k;
+                const int ijk = i + j*icells + k*ijcells;
+                a[ijk+ii1] = TF(8./3.)*plane[jk] - TF(2.)*a[ijk] + TF(1./3.)*a[ijk-ii1];
+                a[ijk+ii2] = TF(8.)   *plane[jk] - TF(9.)*a[ijk] + TF(2.)   *a[ijk-ii1];
+            }
     }
 
     template<typename TF>
@@ -60,7 +84,10 @@ void Boundary_outflow<TF>::exec(
 
     // Outflow
     if (md.mpicoordx == md.npx-1)
-        compute_outflow(data, tmp);
+        compute_outflow(
+                data, tmp,
+                gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
+                gd.icells, gd.jcells, gd.ijcells);
 
     if (md.mpicoordx == 0)
         compute_inflow(data, tmp, TF(0.));
