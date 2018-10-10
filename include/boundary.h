@@ -25,6 +25,7 @@
 
 #include "timedep.h"
 #include "boundary_cyclic.h"
+#include "boundary_outflow.h"
 
 class Master;
 template<typename> class Grid;
@@ -102,6 +103,7 @@ class Boundary
         Grid<TF>& grid;
         Fields<TF>& fields;
         Boundary_cyclic<TF> boundary_cyclic;
+        Boundary_outflow<TF> boundary_outflow;
 
         std::string swboundary;
 
@@ -118,6 +120,7 @@ class Boundary
 
         std::map<std::string, Timedep<TF>*> tdep_bc;
 
+        std::vector<std::string> scalar_outflow;
 
         void process_bcs(Input&); ///< Process the boundary condition settings from the ini file.
 

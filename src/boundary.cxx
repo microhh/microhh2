@@ -34,6 +34,7 @@
 #include "finite_difference.h"
 
 #include "boundary_cyclic.h"
+#include "boundary_outflow.h"
 
 // Boundary schemes.
 #include "boundary.h"
@@ -92,7 +93,8 @@ Boundary<TF>::Boundary(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsin,
     master(masterin),
     grid(gridin),
     fields(fieldsin),
-    boundary_cyclic(master, grid)
+    boundary_cyclic(master, grid),
+    boundary_outflow(master, grid)
 {
     swboundary = "default";
 }
@@ -193,6 +195,9 @@ void Boundary<TF>::process_bcs(Input& input)
             nerror++;
         }
     }
+
+    // Read the scalars for which free inflow / outflow conditions are applied.
+    scalar_outflow = input.get_list<std::string>("boundary", "scalar_outflow", "", std::vector<std::string>());
 
     if (nerror)
         throw 1;
@@ -535,6 +540,11 @@ void Boundary<TF>::exec(Thermo<TF>& thermo)
 
     for (auto& it : fields.sp)
         boundary_cyclic.exec(it.second->fld.data());
+
+    auto tmp = fields.get_tmp();
+    for (auto& s : scalar_outflow)
+        boundary_outflow.exec(fields.sp.at(s)->fld.data(), tmp->fld.data());
+    fields.release_tmp(tmp);
 
     // Update the boundary values.
     update_bcs(thermo);
