@@ -579,10 +579,8 @@ void Boundary<TF>::exec(Thermo<TF>& thermo)
     for (auto& it : fields.sp)
         boundary_cyclic.exec(it.second->fld.data());
 
-    auto tmp = fields.get_tmp();
     for (auto& s : scalar_outflow)
-        boundary_outflow.exec(fields.sp.at(s)->fld.data(), tmp->fld.data());
-    fields.release_tmp(tmp);
+        boundary_outflow.exec(fields.sp.at(s)->fld.data());
 
     // Update the boundary values.
     update_bcs(thermo);
