@@ -27,7 +27,43 @@
 namespace
 {
     template<typename TF>
-    void compute_outflow(
+    void compute_outflow_2nd(
+            TF* const restrict a,
+            const int iend,
+            const int icells, const int jcells, const int kcells,
+            const int ijcells)
+    {
+        const int ii = 1;
+
+        // Set the ghost cells using extrapolation.
+        for (int k=0; k<kcells; ++k)
+            for (int j=0; j<jcells; ++j)
+            {
+                const int ijk = (iend-1) + j*icells + k*ijcells;
+                a[ijk+ii] = a[ijk];
+            }
+    }
+
+    template<typename TF>
+    void compute_inflow_2nd(
+            TF* const restrict a, const TF value,
+            const int istart,
+            const int icells, const int jcells, const int kcells,
+            const int ijcells)
+    {
+        const int ii = 1;
+
+        // Set the ghost cells using extrapolation.
+        for (int k=0; k<kcells; ++k)
+            for (int j=0; j<jcells; ++j)
+            {
+                const int ijk = istart + j*icells + k*ijcells;
+                a[ijk-ii] = value - a[ijk];
+            }
+    }
+
+    template<typename TF>
+    void compute_outflow_4th(
             TF* const restrict a,
             const int iend,
             const int icells, const int jcells, const int kcells,
@@ -49,7 +85,7 @@ namespace
     }
 
     template<typename TF>
-    void compute_inflow(
+    void compute_inflow_4th(
             TF* const restrict a, const TF value,
             const int istart,
             const int icells, const int jcells, const int kcells,
@@ -91,19 +127,39 @@ void Boundary_outflow<TF>::exec(TF* const restrict data)
 
     // Outflow
     if (md.mpicoordx == md.npx-1)
-        compute_outflow(
-                data,
-                gd.iend,
-                gd.icells, gd.jcells, gd.kcells,
-                gd.ijcells);
+    {
+        if (grid.get_spatial_order() == Grid_order::Second)
+            compute_outflow_2nd(
+                    data,
+                    gd.iend,
+                    gd.icells, gd.jcells, gd.kcells,
+                    gd.ijcells);
+
+        else if (grid.get_spatial_order() == Grid_order::Fourth)
+            compute_outflow_4th(
+                    data,
+                    gd.iend,
+                    gd.icells, gd.jcells, gd.kcells,
+                    gd.ijcells);
+    }
 
     // Inflow
     if (md.mpicoordx == 0)
-        compute_inflow(
-                data, TF(0.),
-                gd.istart,
-                gd.icells, gd.jcells, gd.kcells,
-                gd.ijcells);
+    {
+        if (grid.get_spatial_order() == Grid_order::Second)
+            compute_inflow_2nd(
+                    data, TF(0.),
+                    gd.istart,
+                    gd.icells, gd.jcells, gd.kcells,
+                    gd.ijcells);
+
+        else if (grid.get_spatial_order() == Grid_order::Fourth)
+            compute_inflow_4th(
+                    data, TF(0.),
+                    gd.istart,
+                    gd.icells, gd.jcells, gd.kcells,
+                    gd.ijcells);
+    }
 }
 
 template class Boundary_outflow<double>;
