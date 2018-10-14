@@ -64,9 +64,9 @@ namespace
             for (int j=0; j<jcells; ++j)
             {
                 const int ijk = istart + j*icells + k*ijcells;
-                a[ijk-ii1] = value;
-                a[ijk-ii2] = value;
-                a[ijk-ii3] = value;
+                a[ijk-ii1] = value + TF( 1./8.)*a[ijk] - TF( 1./4.)*a[ijk+ii1] + TF( 1./8.)*a[ijk+ii2];
+                a[ijk-ii2] = value + TF( 9./8.)*a[ijk] - TF( 9./4.)*a[ijk+ii1] + TF( 9./8.)*a[ijk+ii2];
+                a[ijk-ii3] = value + TF(25./8.)*a[ijk] - TF(25./4.)*a[ijk+ii1] + TF(25./8.)*a[ijk+ii2];
             }
     }
 }
@@ -97,6 +97,7 @@ void Boundary_outflow<TF>::exec(TF* const restrict data)
                 gd.icells, gd.jcells, gd.kcells,
                 gd.ijcells);
 
+    // Inflow
     if (md.mpicoordx == 0)
         compute_inflow(
                 data, TF(0.),
