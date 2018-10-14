@@ -1,5 +1,5 @@
 /* [wxMaxima batch file version 1] [ DO NOT EDIT BY HAND! ]*/
-/* [ Created with wxMaxima version 0.8.5 ] */
+/* [ Created with wxMaxima version 15.04.0 ] */
 
 /* [wxMaxima: input   start ] */
 f(x) := f0 + f1*x/1! + f2*x^2/2! + f3*x^3/3! + f4*x^4/4! + f5*x^5/5! + f6*x^6/6!;
@@ -90,16 +90,27 @@ ratsimp( subst([f5=0,f6=0], sol2) );
 /* [wxMaxima: input   end   ] */
 
 /* [wxMaxima: input   start ] */
-kill(all);
+eq1 : f[1/2] = f(1/2*h)$
+eq2 : f[3/2] = f(3/2*h)$
+eq3 : f[5/2] = f(5/2*h)$
+sol3 : linsolve([eq1,eq2,eq3],[f0,f1,f2]);
 /* [wxMaxima: input   end   ] */
 
 /* [wxMaxima: input   start ] */
-bc1dir2 : solve( sol2[5], f[-1])$
-bc1dir2 : subst(0, f3, bc1dir2);
+ratsimp( subst([f3=0,f4=0,f5=0,f6=0], sol3) );
 /* [wxMaxima: input   end   ] */
 
 /* [wxMaxima: input   start ] */
-ratsimp( subst([f4=0,f5=0,f6=0], bc1dir2) );
+bc1dirtemp : solve(sol1[1], f[-1/2]);
+bc1dirtemp : subst(sol3[1], bc1dirtemp);
+bc2dir : ratsimp( solve( subst( bc1dirtemp, sol1[2]), f[-3/2]) );
+bc2dir : subst(sol3[2], bc2dir);
+bc1dir : ratsimp( subst(bc2dir, bc1dirtemp) );
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+ratsimp( subst([f3=0,f4=0,f5=0,f6=0], bc1dir) );
+ratsimp( subst([f3=0,f4=0,f5=0,f6=0], bc2dir) );
 /* [wxMaxima: input   end   ] */
 
 /* Maxima can't load/batch files which end with a comment! */
