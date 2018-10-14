@@ -78,9 +78,9 @@ namespace
             for (int j=0; j<jcells; ++j)
             {
                 const int ijk = (iend-1) + j*icells + k*ijcells;
-                a[ijk+ii1] = TF( 3.)*a[ijk] - TF( 3.)*a[ijk-ii1] +        a[ijk-ii2];
-                a[ijk+ii2] = TF( 6.)*a[ijk] - TF( 8.)*a[ijk-ii1] + TF(3.)*a[ijk-ii2];
-                a[ijk+ii3] = TF(10.)*a[ijk] - TF(15.)*a[ijk-ii1] + TF(6.)*a[ijk-ii2];
+                a[ijk+ii1] = TF(15./8.)*a[ijk] - TF(10./8.)*a[ijk-ii1] + TF(3./8.)*a[ijk-ii2];
+                a[ijk+ii2] = TF(15./8.)*a[ijk] - TF(10./8.)*a[ijk-ii1] + TF(3./8.)*a[ijk-ii2];
+                a[ijk+ii3] = TF(15./8.)*a[ijk] - TF(10./8.)*a[ijk-ii1] + TF(3./8.)*a[ijk-ii2];
             }
     }
 
