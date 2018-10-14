@@ -35,14 +35,16 @@ namespace
     {
         const int ii1 = 1;
         const int ii2 = 2;
+        const int ii3 = 3;
 
         // Set the ghost cells using extrapolation.
         for (int k=0; k<kcells; ++k)
             for (int j=0; j<jcells; ++j)
             {
                 const int ijk = (iend-1) + j*icells + k*ijcells;
-                a[ijk+ii1] = TF(3.)*a[ijk] - TF(3.)*a[ijk-ii1] + a[ijk-ii2];
-                a[ijk+ii2] = TF(6.)*a[ijk] - TF(8.)*a[ijk-ii1] + TF(3.)*a[ijk-ii2];
+                a[ijk+ii1] = TF( 3.)*a[ijk] - TF( 3.)*a[ijk-ii1] +        a[ijk-ii2];
+                a[ijk+ii2] = TF( 6.)*a[ijk] - TF( 8.)*a[ijk-ii1] + TF(3.)*a[ijk-ii2];
+                a[ijk+ii3] = TF(10.)*a[ijk] - TF(15.)*a[ijk-ii1] + TF(6.)*a[ijk-ii2];
             }
     }
 
