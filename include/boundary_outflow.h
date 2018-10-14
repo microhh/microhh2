@@ -37,7 +37,7 @@ class Boundary_outflow
         Boundary_outflow(Master&, Grid<TF>&); // Constuctor of the boundary class.
         ~Boundary_outflow();                  // Destructor of the boundary class.
 
-        void exec(TF* const restrict, TF* const restrict);
+        void exec(TF* const restrict);
 
     private:
         Master& master; // Reference to master class.

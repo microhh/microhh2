@@ -28,38 +28,44 @@ namespace
 {
     template<typename TF>
     void compute_outflow(
-            TF* const restrict a, TF* const restrict plane,
-            const int iend, const int jstart, const int jend, const int kstart, const int kend,
-            const int icells, const int jcells, const int ijcells)
+            TF* const restrict a,
+            const int iend,
+            const int icells, const int jcells, const int kcells,
+            const int ijcells)
     {
-        const int i = iend-1;
         const int ii1 = 1;
         const int ii2 = 2;
 
-        // Compute the boundary value
-        for (int k=kstart; k<kend; ++k)
-            for (int j=jstart; j<jend; ++j)
+        // Set the ghost cells using extrapolation.
+        for (int k=0; k<kcells; ++k)
+            for (int j=0; j<jcells; ++j)
             {
-                const int jk  = j + jcells*k;
-                const int ijk = i + j*icells + k*ijcells;
-                plane[jk] = a[ijk];
-            }
-
-        // Set the ghost cells using Dirichlet
-        for (int k=kstart; k<kend; ++k)
-            for (int j=jstart; j<jend; ++j)
-            {
-                const int jk  = j + jcells*k;
-                const int ijk = i + j*icells + k*ijcells;
-                a[ijk+ii1] = TF(8./3.)*plane[jk] - TF(2.)*a[ijk] + TF(1./3.)*a[ijk-ii1];
-                a[ijk+ii2] = TF(8.)   *plane[jk] - TF(9.)*a[ijk] + TF(2.)   *a[ijk-ii1];
+                const int ijk = (iend-1) + j*icells + k*ijcells;
+                a[ijk+ii1] = TF(3.)*a[ijk] - TF(3.)*a[ijk-ii1] + a[ijk-ii2];
+                a[ijk+ii2] = TF(6.)*a[ijk] - TF(8.)*a[ijk-ii1] + TF(3.)*a[ijk-ii2];
             }
     }
 
     template<typename TF>
     void compute_inflow(
-            TF* const restrict data, TF* const restrict tmp, const TF value)
+            TF* const restrict a, const TF value,
+            const int istart,
+            const int icells, const int jcells, const int kcells,
+            const int ijcells)
     {
+        const int ii1 = 1;
+        const int ii2 = 2;
+        const int ii3 = 3;
+
+        // Set the ghost cells using extrapolation.
+        for (int k=0; k<kcells; ++k)
+            for (int j=0; j<jcells; ++j)
+            {
+                const int ijk = istart + j*icells + k*ijcells;
+                a[ijk-ii1] = value;
+                a[ijk-ii2] = value;
+                a[ijk-ii3] = value;
+            }
     }
 }
 
@@ -76,8 +82,7 @@ Boundary_outflow<TF>::~Boundary_outflow()
 }
 
 template<typename TF>
-void Boundary_outflow<TF>::exec(
-        TF* const restrict data, TF* const restrict tmp)
+void Boundary_outflow<TF>::exec(TF* const restrict data)
 {
     auto& gd = grid.get_grid_data();
     auto& md = master.get_MPI_data();
@@ -85,12 +90,17 @@ void Boundary_outflow<TF>::exec(
     // Outflow
     if (md.mpicoordx == md.npx-1)
         compute_outflow(
-                data, tmp,
-                gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
-                gd.icells, gd.jcells, gd.ijcells);
+                data,
+                gd.iend,
+                gd.icells, gd.jcells, gd.kcells,
+                gd.ijcells);
 
     if (md.mpicoordx == 0)
-        compute_inflow(data, tmp, TF(0.));
+        compute_inflow(
+                data, TF(0.),
+                gd.istart,
+                gd.icells, gd.jcells, gd.kcells,
+                gd.ijcells);
 }
 
 template class Boundary_outflow<double>;
