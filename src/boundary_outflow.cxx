@@ -78,9 +78,9 @@ namespace
             for (int j=0; j<jcells; ++j)
             {
                 const int ijk = (iend-1) + j*icells + k*ijcells;
-                a[ijk+ii1] = TF(15./8.)*a[ijk] - TF(10./8.)*a[ijk-ii1] + TF(3./8.)*a[ijk-ii2];
-                a[ijk+ii2] = TF(15./8.)*a[ijk] - TF(10./8.)*a[ijk-ii1] + TF(3./8.)*a[ijk-ii2];
-                a[ijk+ii3] = TF(15./8.)*a[ijk] - TF(10./8.)*a[ijk-ii1] + TF(3./8.)*a[ijk-ii2];
+                a[ijk+ii1] = TF(2.)*a[ijk] - TF( 3./2.)*a[ijk-ii1] + TF(1./2.)*a[ijk-ii2];
+                a[ijk+ii2] = TF(3.)*a[ijk] - TF( 7./2.)*a[ijk-ii1] + TF(3./2.)*a[ijk-ii2];
+                a[ijk+ii3] = TF(5.)*a[ijk] - TF(15./2.)*a[ijk-ii1] + TF(7./2.)*a[ijk-ii2];
             }
     }
 
@@ -100,9 +100,9 @@ namespace
             for (int j=0; j<jcells; ++j)
             {
                 const int ijk = istart + j*icells + k*ijcells;
-                a[ijk-ii1] = value + TF( 1./8.)*a[ijk] - TF( 1./4.)*a[ijk+ii1] + TF( 1./8.)*a[ijk+ii2];
-                a[ijk-ii2] = value + TF( 9./8.)*a[ijk] - TF( 9./4.)*a[ijk+ii1] + TF( 9./8.)*a[ijk+ii2];
-                a[ijk-ii3] = value + TF(25./8.)*a[ijk] - TF(25./4.)*a[ijk+ii1] + TF(25./8.)*a[ijk+ii2];
+                a[ijk-ii1] = value + TF( 9./8.)*a[ijk] - TF( 14./8.)*a[ijk+ii1] + TF( 5./8.)*a[ijk+ii2];
+                a[ijk-ii2] = value + TF(33./8.)*a[ijk] - TF( 54./8.)*a[ijk+ii1] + TF(21./8.)*a[ijk+ii2];
+                a[ijk-ii3] = value + TF(65./8.)*a[ijk] - TF(110./8.)*a[ijk+ii1] + TF(45./8.)*a[ijk+ii2];
             }
     }
 }

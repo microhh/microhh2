@@ -104,9 +104,22 @@ ratsimp( subst([f3=0,f4=0,f5=0,f6=0], sol3) );
 eq1 : f[-1/2] = f(-1/2*h)$
 eq2 : f[-3/2] = f(-3/2*h)$
 eq3 : f[-5/2] = f(-5/2*h)$
-eq1 : subst(sol3, eq1)$
-eq2 : subst(sol3, eq2)$
-eq3 : subst(sol3, eq3)$
+
+eq1 : subst(f0bc, f0, eq1)$
+eq1 : subst(sol3[2], eq1)$
+/* eq1 : subst(sol3[3], eq1)$ */
+eq1 : subst(0, f2, eq1)$
+
+eq2 : subst(f0bc, f0, eq2)$
+eq2 : subst(sol3[2], eq2)$
+/* eq2 : subst(sol3[3], eq2)$ */
+eq2 : subst(0, f2, eq2)$
+
+eq3 : subst(f0bc, f0, eq3)$
+eq3 : subst(sol3[2], eq3)$
+/* eq3 : subst(sol3[3], eq3)$ */
+eq3 : subst(0, f2, eq3)$
+
 ratsimp( subst([f3=0,f4=0,f5=0,f6=0], eq1) );
 ratsimp( subst([f3=0,f4=0,f5=0,f6=0], eq2) );
 ratsimp( subst([f3=0,f4=0,f5=0,f6=0], eq3) );
@@ -128,6 +141,31 @@ eq3 : subst(sol3[3], eq3)$
 expand( subst([f3=0,f4=0,f5=0,f6=0], eq1) );
 expand( subst([f3=0,f4=0,f5=0,f6=0], eq2) );
 expand( subst([f3=0,f4=0,f5=0,f6=0], eq3) );
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+eq1 : f[-1/2] = f(-1/2*h)$
+eq2 : f[-3/2] = f(-3/2*h)$
+eq3 : f[-5/2] = f(-5/2*h)$
+sol4 : linsolve([eq1,eq2,eq3],[f0,f1,f2]);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+eq1 : f[1/2] = f(1/2*h)$
+eq2 : f[3/2] = f(3/2*h)$
+eq3 : f[5/2] = f(5/2*h)$
+eq1 : subst(sol4[1], eq1)$
+eq1 : subst(0, f1, eq1)$
+eq1 : subst(0, f2, eq1)$
+eq2 : subst(sol4[1], eq2)$
+eq2 : subst(0, f1, eq2)$
+eq2 : subst(0, f2, eq2)$
+eq3 : subst(sol4[1], eq3)$
+eq3 : subst(0, f1, eq3)$
+eq3 : subst(0, f2, eq3)$
+ratsimp( subst([f3=0,f4=0,f5=0,f6=0], eq1) );
+ratsimp( subst([f3=0,f4=0,f5=0,f6=0], eq2) );
+ratsimp( subst([f3=0,f4=0,f5=0,f6=0], eq3) );
 /* [wxMaxima: input   end   ] */
 
 /* Maxima can't load/batch files which end with a comment! */
