@@ -82,11 +82,11 @@ template<typename TF>
 Source<TF>::Source(Master& master, Grid<TF>& grid, Fields<TF>& fields, Input& input) :
     master(master), grid(grid), fields(fields)
 {
-    swsource = input.get_item("source", "swsource", "", "0");
+    swsource = input.get_item<std::string>("source", "swsource", "", "0");
 
     if (swsource == "1")
     {
-        sourcelist = input.get_list<std::string>("source", "sourcelist", "", std::vector<std::string>());
+        sourcelist = input.get_list<std::string>("source", "sourcelist", "");
 
         source_x0 = input.get_list<TF>("source", "source_x0", "");
         source_y0 = input.get_list<TF>("source", "source_y0", "");
@@ -112,6 +112,11 @@ void Source<TF>::init()
 {
     if (swsource == "1")
     {
+        shape.resize(source_x0.size());
+        norm.resize(source_x0.size());
+
+        auto& gd = grid.get_grid_data();
+        blob.resize(gd.ncells);
     }
 }
 
@@ -120,9 +125,6 @@ template<typename TF>
 void Source<TF>::create(Input& input)
 {
     auto& gd = grid.get_grid_data();
-
-    shape.resize(source_x0.size());
-    norm.resize(source_x0.size());
 
     for (int n=0; n<source_x0.size(); ++n)
     {
@@ -137,8 +139,6 @@ void Source<TF>::create(Input& input)
                 gd.z.data(), source_z0[n], sigma_z[n], line_z[n],
                 shape[n].range_x, shape[n].range_y, shape[n].range_z);
     }
-
-    blob.resize(gd.ncells);
 }
 
 // Add the source to the fields. This function is called in the main time loop.
