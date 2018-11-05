@@ -44,6 +44,8 @@
 #include "radiation.h"
 #include "microphys.h"
 #include "decay.h"
+#include "source.h"
+
 #include "stats.h"
 #include "column.h"
 #include "cross.h"
@@ -125,6 +127,8 @@ Model<TF>::Model(Master& masterin, int argc, char *argv[]) :
         force     = std::make_shared<Force    <TF>>(master, *grid, *fields, *input);
         buffer    = std::make_shared<Buffer   <TF>>(master, *grid, *fields, *input);
         decay     = std::make_shared<Decay    <TF>>(master, *grid, *fields, *input);
+        source    = std::make_shared<Source   <TF>>(master, *grid, *fields, *input);
+
         stats     = std::make_shared<Stats    <TF>>(master, *grid, *fields, *advec, *diff, *input);
         column    = std::make_shared<Column   <TF>>(master, *grid, *fields, *input);
         dump      = std::make_shared<Dump     <TF>>(master, *grid, *fields, *input);
@@ -175,6 +179,7 @@ void Model<TF>::init()
     microphys->init();
     radiation->init();
     decay->init(*input);
+    source->init();
 
     stats->init(timeloop->get_ifactor());
     column->init(timeloop->get_ifactor());
@@ -231,6 +236,7 @@ void Model<TF>::load()
     microphys->create(*input, *profs, *stats, *cross, *dump);
     radiation->create(*thermo); // Radiation needs to be created after thermo as it needs base profiles.
     decay->create(*input);
+    source->create(*input);
 
     cross->create();    // Cross needs to be called at the end!
 
@@ -331,6 +337,9 @@ void Model<TF>::exec()
 
                 // Apply the scalar decay.
                 decay->exec(timeloop->get_sub_time_step());
+
+                // Add point and line sources of scalars.
+                source->exec();
 
                 // Apply the large scale forcings. Keep this one always right before the pressure.
                 force->exec(timeloop->get_sub_time_step());

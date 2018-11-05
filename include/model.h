@@ -46,6 +46,7 @@ template<typename> class Microphys;
 template<typename> class Radiation;
 
 template<typename> class Decay;
+template<typename> class Source;
 
 template<typename> class Stats;
 template<typename> class Column;
@@ -89,6 +90,7 @@ class Model
         std::shared_ptr<Radiation<TF>> radiation;
 
         std::shared_ptr<Decay<TF>> decay;
+        std::shared_ptr<Source<TF>> source;
 
         std::shared_ptr<Stats<TF>> stats;
         std::shared_ptr<Column<TF>> column;
@@ -110,6 +112,5 @@ class Model
         void clear_gpu();
 
         void add_statistics_masks();
-
 };
 #endif
