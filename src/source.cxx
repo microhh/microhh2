@@ -33,16 +33,6 @@
 
 namespace
 {
-    template<typename TF>
-    bool is_blob(const TF x, const TF x0, const TF line_x, const TF sigma_x)
-    {
-        bool in = false;
-
-        if ( std::abs(x-x0) < 4*sigma_x && x-x0-line_x < 4*sigma_x )
-            in = true;
-
-        return in;
-    }
 
     template<typename TF>
     std::vector<int> calc_shape(const TF* restrict x, const TF x0, const TF sigma_x, const TF line_x, int istart, int iend)
@@ -114,9 +104,6 @@ void Source<TF>::init()
     {
         shape.resize(source_x0.size());
         norm.resize(source_x0.size());
-
-        auto& gd = grid.get_grid_data();
-        blob.resize(gd.ncells);
     }
 }
 
@@ -147,18 +134,22 @@ void Source<TF>::exec()
 {
     auto& gd = grid.get_grid_data();
 
+    auto blob = fields.get_tmp();
+
     for (int n=0; n<sourcelist.size(); ++n)
     {
         calc_source(
-                blob.data(),
+                blob->fld.data(),
                 gd.x.data(), source_x0[n], sigma_x[n], line_x[n], 
                 gd.y.data(), source_y0[n], sigma_y[n], line_y[n], 
                 gd.z.data(), source_z0[n], sigma_z[n], line_z[n], 
                 shape[n].range_x, shape[n].range_y, shape[n].range_z,
                 strength[n], norm[n]);
 
-        add_source(fields.st[sourcelist[n]]->fld.data(), blob.data(), shape[n].range_x, shape[n].range_y, shape[n].range_z);
+        add_source(fields.st[sourcelist[n]]->fld.data(), blob->fld.data(), shape[n].range_x, shape[n].range_y, shape[n].range_z);
     }
+    
+    fields.release_tmp(blob);
 }
 
 template<typename TF>
@@ -286,7 +277,7 @@ void Source<TF>::calc_source(
 }
  
 template<typename TF>
-void Source<TF>::add_source(TF* const restrict st, const TF* const restrict,
+void Source<TF>::add_source(TF* const restrict st, const TF* const restrict blob,
         std::vector<int> range_x, std::vector<int>range_y, std::vector<int> range_z)
 {
     auto& gd = grid.get_grid_data();
