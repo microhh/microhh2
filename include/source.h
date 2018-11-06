@@ -69,7 +69,6 @@ class Source
         std::vector<TF> line_x;
         std::vector<TF> line_y;
         std::vector<TF> line_z;
-        std::vector<TF> blob;
         std::vector<TF> norm;
 
         TF calc_norm(
