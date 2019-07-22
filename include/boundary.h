@@ -39,6 +39,7 @@ class Input;
 
 enum class Boundary_type   {Dirichlet_type, Neumann_type, Flux_type, Ustar_type};
 enum class Boundary_w_type {Normal_type, Conservation_type};
+enum class Openbc_type     {disabled, enabled};
 
 /**
  * Structure containing the boundary options and values per 3d field.
@@ -81,6 +82,9 @@ class Boundary
 
         // virtual void get_mask(Field3d*, Field3d*, Mask*); ///< Calculate statistics mask
         // virtual void get_surface_mask(Field3d*);          ///< Calculate surface mask
+
+        std::vector<std::string> openbc_list;        ///< List of variables that have open boundary conditions.
+        std::map<std::string, std::vector<TF>> openbc_profs; ///< Map of profiles with open boundary conditions stored by its name.
 
         std::string get_switch();
 
@@ -138,5 +142,8 @@ class Boundary
     private:
         virtual void update_bcs(Thermo<TF>&); // Update the boundary values.
         virtual void update_slave_bcs(); // Update the slave boundary values.
+
+        Openbc_type swopenbc;
+
 };
 #endif

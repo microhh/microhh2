@@ -24,6 +24,7 @@ vg    = np.zeros(np.size(z))
 wls   = np.zeros(np.size(z))
 thlls = np.zeros(np.size(z))
 qtls  = np.zeros(np.size(z))
+thl_bc = np.zeros((4,np.size(z)))
 
 for k in range(kmax):
     # temperature
@@ -74,6 +75,9 @@ for k in range(kmax):
     elif(z[k] <= 500):
         qtls[k] = -1.2 + (z[k]-300)*(1.2)/(500.-300)
 
+    thl_bc[0:2,k] = thl[k] - 2
+    thl_bc[2:4,k] = thl[k] + 2
+
 # normalize profiles to SI
 #qtls /= 1000.  # from g/kg to kg/kg
 wls  /= 100.   # from cm/s to m/s
@@ -82,6 +86,7 @@ qtls *= 1.e-8
 
 nc_file = nc.Dataset("bomex_input.nc", mode="w", datamodel="NETCDF4", clobber=False)
 nc_file.createDimension("z", kmax)
+nc_file.createDimension("corners", 4)
 nc_z = nc_file.createVariable("z", float_type, ("z"))
 
 nc_group_init = nc_file.createGroup("init");
@@ -95,6 +100,8 @@ nc_wls   = nc_group_init.createVariable("w_ls"  , float_type, ("z"))
 nc_thlls = nc_group_init.createVariable("thl_ls", float_type, ("z"))
 nc_qtls  = nc_group_init.createVariable("qt_ls" , float_type, ("z"))
 
+nc_thlbc  = nc_group_init.createVariable("thl_bc" , float_type, ("corners","z"))
+
 nc_z    [:] = z    [:]
 nc_thl  [:] = thl  [:]
 nc_qt   [:] = qt   [:]
@@ -105,5 +112,6 @@ nc_vg   [:] = vg   [:]
 nc_wls  [:] = wls  [:]
 nc_thlls[:] = thlls[:]
 nc_qtls [:] = qtls [:]
+nc_thlbc [:,:] = thl_bc [:,:]
 
 nc_file.close()
