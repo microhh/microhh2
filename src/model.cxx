@@ -19,7 +19,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MicroHH.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+#include <iostream>
 #include <string>
 #include <cstdio>
 #include <algorithm>
@@ -115,7 +115,6 @@ Model<TF>::Model(Master& masterin, int argc, char *argv[]) :
         fft       = std::make_shared<FFT<TF>>(master, *grid);
 
         boundary  = Boundary<TF> ::factory(master, *grid, *fields, *input);
-
         advec     = Advec<TF>    ::factory(master, *grid, *fields, *input);
         diff      = Diff<TF>     ::factory(master, *grid, *fields, *boundary, *input);
         pres      = Pres<TF>     ::factory(master, *grid, *fields, *fft, *input);
@@ -227,7 +226,6 @@ void Model<TF>::load()
     fields->load(timeloop->get_iotime());
     fields->create_stats(*stats);
     fields->create_column(*column);
-
     boundary->create(*input, *input_nc, *stats);
     buffer->create(*input, *input_nc, *stats);
     force->create(*input, *input_nc, *stats);
