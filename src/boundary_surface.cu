@@ -285,6 +285,9 @@ void Boundary_surface<TF>::prepare_device()
 
     cuda_safe_call(cudaMemcpy(zL_sl_g, zL_sl.data(), nzL*sizeof(float), cudaMemcpyHostToDevice));
     cuda_safe_call(cudaMemcpy(f_sl_g,  f_sl.data(),  nzL*sizeof(float), cudaMemcpyHostToDevice));
+
+    Boundary<TF>::prepare_device();
+
 }
 
 // TMP BVS
@@ -323,6 +326,8 @@ void Boundary_surface<TF>::clear_device()
     cuda_safe_call(cudaFree(nobuk_g));
     cuda_safe_call(cudaFree(zL_sl_g));
     cuda_safe_call(cudaFree(f_sl_g ));
+    Boundary<TF>::clear_device();
+
 }
 
 #ifdef USECUDA

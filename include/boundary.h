@@ -89,9 +89,14 @@ class Boundary
         std::string get_switch();
 
         // GPU functions and variables
+        // virtual void forward_device();
+        // virtual void backward_device();
+        #ifdef USECUDA
         virtual void prepare_device();
-        virtual void forward_device();
-        virtual void backward_device();
+        virtual void clear_device();
+        virtual void forward_device() {};
+        virtual void backward_device() {};
+        #endif
 
         TF z0m;
         TF z0h;
@@ -102,6 +107,7 @@ class Boundary
         TF* obuk_g;
         TF* ustar_g;
         int* nobuk_g;
+        std::map<std::string, TF*> openbc_profs_g; ///< Map of profiles with open boundary conditions stored by its name.
 
     protected:
         Master& master;
@@ -114,6 +120,7 @@ class Boundary
 
         Boundary_type mbcbot;
         Boundary_type mbctop;
+        Openbc_type swopenbc;
 
         TF ubot;
         TF utop;
@@ -129,10 +136,9 @@ class Boundary
 
         void process_bcs(Input&); ///< Process the boundary condition settings from the ini file.
 
+        void process_openbc(Netcdf_handle&); ///< Process the open boundary conditions settings from the ini file.
         void process_time_dependent(Input&, Netcdf_handle&); ///< Process the time dependent settings from the ini file.
-        #ifdef USECUDA
-        void clear_device();
-        #endif
+
 
         // void set_bc(double*, double*, double*, Boundary_type, double, double, double); ///< Set the values for the boundary fields.
 
@@ -143,7 +149,6 @@ class Boundary
         virtual void update_bcs(Thermo<TF>&); // Update the boundary values.
         virtual void update_slave_bcs(); // Update the slave boundary values.
 
-        Openbc_type swopenbc;
 
 };
 #endif

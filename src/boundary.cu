@@ -19,7 +19,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MicroHH.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+#include <iostream>
 #include <cstdio>
 #include <cmath>
 #include <algorithm>
@@ -233,6 +233,64 @@ namespace
             w[ijk+kk2] = -w[ijk-kk2];
         }
     }
+
+
+    template<typename TF> __global__
+    void calc_openbc_x(TF* restrict data, TF* corners,
+            const int igc, const int jgc, const int itot, const int jtot, const int istart, const int jstart, const int kstart, const int iend, const int jend, const int kend,
+             const int icells, const int jcells, const int kcells, const int ijcells)
+    {
+        const int i = blockIdx.x*blockDim.x + threadIdx.x + istart;
+        const int j = blockIdx.y*blockDim.y + threadIdx.y + jstart;
+        const int k = blockIdx.z + kstart;
+
+        const int jj = icells;
+        const int kk = ijcells;
+
+        // East-west
+        if (k < kend && j < jend && i < igc)
+        {
+            const int ijk0 = i          + j*jj + k*kk;
+            const int ijk1 = i+iend     + j*jj + k*kk;
+
+            TF slope     = (corners[k + 2 *kcells] - corners[k + 0 *kcells]) / jtot
+                         - (corners[k + 3 *kcells] - corners[k + 1 *kcells]) / jtot; //- slope_data
+            TF intercept = (corners[k + 0 *kcells])
+                         - (corners[k + 1 *kcells]); //- intercept_data
+
+            data[ijk0] += slope*j + intercept;
+            data[ijk1] -= slope*j + intercept;
+        }
+    }
+
+    template<typename TF> __global__
+    void calc_openbc_y(TF* restrict data, TF* corners,
+            const int igc, const int jgc, const int itot, const int jtot, const int istart, const int jstart, const int kstart, const int iend, const int jend, const int kend,
+            const int icells, const int jcells, const int kcells, const int ijcells)
+    {
+        const int i = blockIdx.x*blockDim.x + threadIdx.x + istart;
+        const int j = blockIdx.y*blockDim.y + threadIdx.y + jstart;
+        const int k = blockIdx.z + kstart;
+
+        const int jj = icells;
+        const int kk = icells*jcells;
+
+        // East-west
+        if (k < kend && j < jgc && i < iend)
+        {
+            const int ijk0 = i + j           *jj + k*kk;
+            const int ijk1 = i + (j+jend  )  *jj + k*kk;
+
+            TF slope     = (corners[k + 3 *kcells] - corners[k + 2 *kcells]) / jtot
+                         - (corners[k + 1 *kcells] - corners[k + 0 *kcells]) / jtot; //- slope_data
+            TF intercept = (corners[k + 2 *kcells])
+                         - (corners[k + 0 *kcells]); //- intercept_data
+
+            data[ijk0] += slope * i + intercept;
+            data[ijk1] -= slope * i + intercept;
+        }
+    }
+
 }
 
 #ifdef USECUDA
@@ -249,6 +307,8 @@ void Boundary<TF>::exec(Thermo<TF>& thermo)
     dim3 grid2dGPU (gridi, gridj);
     dim3 block2dGPU(blocki, blockj);
 
+    dim3 gridGPU (gridi, gridj, gd.kcells);
+    dim3 blockGPU(blocki, blockj, 1);
     // Cyclic boundary conditions, do this before the bottom BC's.
     boundary_cyclic.exec_g(fields.mp.at("u")->fld_g);
     boundary_cyclic.exec_g(fields.mp.at("v")->fld_g);
@@ -256,6 +316,15 @@ void Boundary<TF>::exec(Thermo<TF>& thermo)
 
     for (auto& it : fields.sp)
         boundary_cyclic.exec_g(it.second->fld_g);
+
+    if (swopenbc == Openbc_type::enabled)
+        for (auto& it : openbc_list)
+        {
+            calc_openbc_x<TF><<<gridGPU, blockGPU>>>(fields.ap.at(it)->fld_g, openbc_profs_g.at(it),
+                gd.igc, gd.jgc, gd.itot, gd.jtot, gd.istart, gd.jstart, gd.kstart, gd.iend, gd.jend, gd.kend, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
+            calc_openbc_y<TF><<<gridGPU, blockGPU>>>(fields.ap.at(it)->fld_g, openbc_profs_g.at(it),
+                gd.igc, gd.jgc, gd.itot, gd.jtot, gd.iend, gd.jend, gd.istart, gd.jstart, gd.kstart, gd.kend, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
+        }
 
     // Calculate the boundary values.
     update_bcs(thermo);
@@ -344,9 +413,35 @@ void Boundary<TF>::exec(Thermo<TF>& thermo)
     }
 }
 #endif
+
+template<typename TF>
+void Boundary<TF>::prepare_device()
+{
+    auto& gd = grid.get_grid_data();
+
+    const int nmemsize  = gd.kcells*sizeof(TF);
+
+    if (swopenbc == Openbc_type::enabled)
+    {
+        for (auto& it : openbc_list)
+        {
+            openbc_profs_g.emplace(it, nullptr);
+            cuda_safe_call(cudaMalloc(&openbc_profs_g.at(it), nmemsize));
+            cuda_safe_call(cudaMemcpy(openbc_profs_g.at(it), openbc_profs.at(it).data(), nmemsize, cudaMemcpyHostToDevice));
+            std::cout << "it"<< openbc_profs.at(it)[10] << "\n";
+        }
+    }
+}
+
 template<typename TF>
 void Boundary<TF>::clear_device()
 {
+
+    if (swopenbc == Openbc_type::enabled)
+    {
+        for (auto& it : openbc_profs_g)
+            cuda_safe_call(cudaFree(it.second));
+    }
     for(auto& it : tdep_bc)
         it.second->clear_device();
 }

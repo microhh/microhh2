@@ -148,6 +148,8 @@ void Boundary_surface_bulk<TF>::prepare_device()
 
     cuda_safe_call(cudaMemcpy2D(obuk_g,  dimemsize, obuk.data(),  dimemsize, dimemsize, gd.jcells, cudaMemcpyHostToDevice));
     cuda_safe_call(cudaMemcpy2D(ustar_g, dimemsize, ustar.data(), dimemsize, dimemsize, gd.jcells, cudaMemcpyHostToDevice));
+
+    Boundary<TF>::prepare_device();
 }
 
 // TMP BVS
@@ -179,6 +181,8 @@ void Boundary_surface_bulk<TF>::clear_device()
 {
     cuda_safe_call(cudaFree(obuk_g ));
     cuda_safe_call(cudaFree(ustar_g));
+    Boundary<TF>::clear_device();
+
 }
 
 #ifdef USECUDA

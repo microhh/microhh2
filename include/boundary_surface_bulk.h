@@ -88,5 +88,6 @@ class Boundary_surface_bulk : public Boundary<TF>
     protected:
 
         void update_slave_bcs();
+
 };
 #endif

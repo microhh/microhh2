@@ -236,11 +236,15 @@ void Boundary<TF>::init(Input& input, Thermo<TF>& thermo)
 template<typename TF>
 void Boundary<TF>::create(Input& input, Netcdf_handle& input_nc, Stats<TF>& stats)
 {
-    const Grid_data<TF>& gd = grid.get_grid_data();
-
-    Netcdf_group& group_nc = input_nc.get_group("init");
-
+    process_openbc(input_nc);
     process_time_dependent(input, input_nc);
+}
+
+template<typename TF>
+void Boundary<TF>::process_openbc(Netcdf_handle& input_nc)
+{
+    const Grid_data<TF>& gd = grid.get_grid_data();
+    Netcdf_group& group_nc = input_nc.get_group("init");
 
     if (swopenbc == Openbc_type::enabled)
     {
@@ -254,7 +258,14 @@ void Boundary<TF>::create(Input& input, Netcdf_handle& input_nc, Stats<TF>& stat
             }
             else
             {
-                group_nc.get_variable(openbc_profs[it], it+"_bc", {0,0}, {4,gd.ktot});
+                std::vector<TF> tmp(4*gd.ktot);
+                group_nc.get_variable(tmp, it+"_bc", {0,0}, {4,gd.ktot});
+                for (int n = 0; n < 4; n++)
+                    std::copy(tmp.begin() + n * gd.ktot, tmp.begin() + (n+1) * gd.ktot, openbc_profs[it].begin() + gd.kstart + n * gd.kcells);
+                // Modify subsidence
+
+                // Modify initial field (done in field.cxx)
+                // Subtract utrans and vtrans, if necessary 
             }
         }
     }
@@ -585,8 +596,9 @@ namespace
                 w[ijk+kk1] = TF(-6.)*w[ijk-kk1] + TF(4.)*w[ijk-kk2] - w[ijk-kk3];
             }
     }
+    
     template<typename TF>
-    void calc_open_bc(TF* restrict data, TF* corners,
+    void calc_openbc(TF* restrict data, TF* corners,
             const int igc, const int jgc, const int itot, const int jtot, const int iend, const int jend, const int icells, const int jcells, const int kcells, const int ijcells)
     {
         const int jj = icells;
@@ -594,8 +606,10 @@ namespace
         // west boundary
         for (int k=0; k<kcells; ++k)
         {
-            TF slope     = (corners[k + 1 *kcells] - corners[k + 0 *kcells]) / jtot; //- slope_data
-            TF intercept = (corners[k + 0 *kcells]); //- intercept_data
+            TF slope     = (corners[k + 2 *kcells] - corners[k + 0 *kcells]) / jtot
+                         - (corners[k + 3 *kcells] - corners[k + 1 *kcells]) / jtot; //- slope_data
+            TF intercept = (corners[k + 0 *kcells])
+                         - (corners[k + 1 *kcells]); //- intercept_data
             for (int j=0; j<jcells; ++j)
                 #pragma ivdep
                 for (int i=0; i<igc; ++i)
@@ -607,8 +621,10 @@ namespace
         // east boundary
         for (int k=0; k<kcells; ++k)
         {
-            TF slope     = (corners[k + 3 *kcells] - corners[k + 2 *kcells]) / jtot; //- slope_data
-            TF intercept = (corners[k + 2 *kcells]); //- intercept_data
+            TF slope     = (corners[k + 3 *kcells] - corners[k + 1 *kcells]) / jtot
+                         - (corners[k + 2 *kcells] - corners[k + 0 *kcells]) / jtot; //- slope_data
+            TF intercept = (corners[k + 1 *kcells])
+                         - (corners[k + 0 *kcells]); //- intercept_data
             for (int j=0; j<jcells; ++j)
                 #pragma ivdep
                 for (int i=0; i<igc; ++i)
@@ -620,8 +636,10 @@ namespace
         // north boundary
         for (int k=0; k<kcells; ++k)
         {
-            TF slope     = (corners[k + 0 *kcells] - corners[k + 2 *kcells]) / itot; //- slope_data
-            TF intercept = (corners[k + 0 *kcells]); //- intercept_data
+            TF slope     = (corners[k + 3 *kcells] - corners[k + 2 *kcells]) / jtot
+                         - (corners[k + 1 *kcells] - corners[k + 0 *kcells]) / jtot; //- slope_data
+            TF intercept = (corners[k + 2 *kcells])
+                         - (corners[k + 0 *kcells]); //- intercept_data
             for (int j=0; j<jgc; ++j)
                 #pragma ivdep
                 for (int i=0; i<icells; ++i)
@@ -633,8 +651,10 @@ namespace
         // south boundary
         for (int k=0; k<kcells; ++k)
         {
-            TF slope     = (corners[k + 3 *kcells] - corners[k + 1 *kcells]) / itot; //- slope_data
-            TF intercept = (corners[k + 1 *kcells]); //- intercept_data
+            TF slope     = (corners[k + 1 *kcells] - corners[k + 0 *kcells]) / jtot
+                         - (corners[k + 3 *kcells] - corners[k + 2 *kcells]) / jtot; //- slope_data
+            TF intercept = (corners[k + 0 *kcells])
+                         - (corners[k + 2 *kcells]); //- intercept_data
             for (int j=0; j<jgc; ++j)
                 #pragma ivdep
                 for (int i=0; i<icells; ++i)
@@ -661,8 +681,8 @@ void Boundary<TF>::exec(Thermo<TF>& thermo)
     if (swopenbc == Openbc_type::enabled)
         for (auto& it : openbc_list)
         {
-            calc_open_bc(fields.ap.at(it)->fld.data(), openbc_profs.at(it).data(),
-            gd.igc, gd.jgc, gd.itot, gd.jtot, gd.iend, gd.jend, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
+            calc_openbc(fields.ap.at(it)->fld.data(), openbc_profs.at(it).data(),
+                gd.igc, gd.jgc, gd.itot, gd.jtot, gd.iend, gd.jend, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
         }
 
     // Update the boundary values.
@@ -911,7 +931,7 @@ void Boundary<TF>::get_surface_mask(Field3d* field)
 }
 
 */
-template<typename TF>
+/* template<typename TF>
 void Boundary<TF>::prepare_device()
 {
 }
@@ -925,6 +945,6 @@ template<typename TF>
 void Boundary<TF>::backward_device()
 {
 }
-
+ */
 template class Boundary<double>;
 template class Boundary<float>;

@@ -29,6 +29,7 @@
 #include "thermo.h"
 #include "boundary_surface_bulk.h"
 #include "constants.h"
+#include "netcdf_interface.h"
 
 namespace
 {
@@ -146,6 +147,7 @@ void Boundary_surface_bulk<TF>::create(Input& input, Netcdf_handle& input_nc, St
 {
     const std::string group_name = "default";
 
+    Boundary<TF>::process_openbc(input_nc);
     Boundary<TF>::process_time_dependent(input, input_nc);
 
     // add variables to the statistics

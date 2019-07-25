@@ -186,6 +186,7 @@ class Fields
         std::string vortexaxis;
 
         void add_mean_profs(Netcdf_handle&);
+        void add_divergence(Netcdf_handle&);
         // int add_mean_prof(Input*, std::string, double*, double);
         void randomize(Input&, std::string, TF* const restrict);
         void add_vortex_pair(Input&);

@@ -656,6 +656,9 @@ void Fields<TF>::create(Input& input, Netcdf_file& input_nc)
     // Add the mean profiles to the fields
     add_mean_profs(input_nc);
 
+    // Add divergence due to open boundaries
+    add_divergence(input_nc);
+
     /*
     nerror += add_mean_prof(inputin, "u", mp.at("u")->data, grid.utrans);
     nerror += add_mean_prof(inputin, "v", mp.at("v")->data, grid.vtrans);
@@ -744,6 +747,28 @@ namespace
                     data[ijk] += dataprof[k-kstart] - offset;
                 }
     }
+
+    template<typename TF>
+    void add_divergence_to_field(TF* restrict const data,
+                                const TF* restrict const dataprof,
+                                const int istart, const int iend,
+                                const int jstart, const int jend,
+                                const int kstart, const int kend,
+                                const int jj, const int kk, const int ktot)
+    {
+        for (int k=kstart; k<kend; ++k)
+            for (int j=jstart; j<jend; ++j)
+                for (int i=istart; i<iend; ++i)
+                {
+                    const int ijk = i + j*jj + k*kk;
+                    TF fac_i = TF(i - istart)/TF(iend - istart);
+                    TF fac_j = TF(j - jstart)/TF(jend - jstart);
+                    data[ijk] += (    fac_i) * (    fac_j) * dataprof[k - kstart           ]
+                               + (1 - fac_i) * (    fac_j) * dataprof[k - kstart + 1 * ktot]
+                               + (    fac_i) * (1 - fac_j) * dataprof[k - kstart + 2 * ktot]
+                               + (1 - fac_i) * (1 - fac_j) * dataprof[k - kstart + 3 * ktot];
+                }
+    }
 }
 
 template<typename TF>
@@ -773,6 +798,26 @@ void Fields<TF>::add_mean_profs(Netcdf_handle& input_nc)
         add_mean_prof_to_field<TF>(f.second->fld.data(), prof.data(), 0.,
                 gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
                 gd.icells, gd.ijcells);
+    }
+}
+
+template<typename TF>
+void Fields<TF>::add_divergence(Netcdf_handle& input_nc)
+{
+    const Grid_data<TF>& gd = grid.get_grid_data();
+    std::vector<TF> prof(4 * gd.ktot);
+
+    const std::vector<int> start = {0,0};
+    const std::vector<int> count = {4,gd.ktot};
+
+    Netcdf_group& group_nc = input_nc.get_group("init");
+
+    for (auto& f : ap)
+    {
+        group_nc.get_variable(prof, f.first+"_bc", start, count);
+        add_divergence_to_field<TF>(f.second->fld.data(), prof.data(),
+                gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
+                gd.icells, gd.ijcells, gd.ktot);
     }
 }
 
