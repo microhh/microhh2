@@ -33,14 +33,14 @@ namespace
     template<typename TF>
     int nc_get_vara_wrapper(
             int, int, const std::vector<size_t>&, const std::vector<size_t>&, std::vector<TF>&);
-    
+
     template<>
     int nc_get_vara_wrapper(
             int ncid, int var_id, const std::vector<size_t>& start, const std::vector<size_t>& count, std::vector<double>& values)
     {
         return nc_get_vara_double(ncid, var_id, start.data(), count.data(), values.data());
     }
-    
+
     template<>
     int nc_get_vara_wrapper(
             int ncid, int var_id, const std::vector<size_t>& start, const std::vector<size_t>& count, std::vector<float>& values)
@@ -73,7 +73,7 @@ namespace
     {
         return nc_put_vara_double(ncid, var_id, start.data(), count.data(), values.data());
     }
-    
+
     template<>
     int nc_put_vara_wrapper(
             int ncid, int var_id, const std::vector<size_t>& start, const std::vector<size_t>& count, const std::vector<float>& values)
@@ -99,7 +99,7 @@ namespace
     {
         return nc_put_vara_double(ncid, var_id, start.data(), count.data(), &value);
     }
-    
+
     template<>
     int nc_put_vara_wrapper(
             int ncid, int var_id, const std::vector<size_t>& start, const std::vector<size_t>& count, const float value)
@@ -552,8 +552,9 @@ std::vector<TF> Netcdf_handle::get_variable(
     int nc_check_code = 0;
     int var_id;
 
-    if (master.get_mpiid() == mpiid_to_write)
-        nc_check_code = nc_inq_varid(ncid, name.c_str(), &var_id);
+    if (master.get_mpiid() == mpiid_to_write){
+    nc_check_code = nc_inq_varid(ncid, name.c_str(), &var_id);
+    }
     nc_check(master, nc_check_code, mpiid_to_write);
 
     int total_count = std::accumulate(i_count.begin(), i_count.end(), 1, std::multiplies<>());
@@ -561,11 +562,11 @@ std::vector<TF> Netcdf_handle::get_variable(
     // CvH check needs to be added if total count matches multiplication of all dimensions.
 
     std::vector<TF> values(total_count);
-    if (master.get_mpiid() == mpiid_to_write)
+    if (master.get_mpiid() == mpiid_to_write){
         nc_check_code = nc_get_vara_wrapper(ncid, var_id, i_start_size_t, i_count_size_t, values);
+    }
     nc_check(master, nc_check_code, mpiid_to_write);
     master.broadcast(values.data(), total_count, mpiid_to_write);
-
     return values;
 }
 

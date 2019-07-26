@@ -62,7 +62,6 @@ void Field3d_operators<TF>::calc_mean_profile(TF* const restrict prof, const TF*
         prof[k] = tmp / n;
     }
     master.sum(prof, gd.kcells);
-
 }
 template<typename TF>
 void Field3d_operators<TF>::calc_mean_profile_nogc(

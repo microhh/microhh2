@@ -42,6 +42,7 @@
 #include "dump.h"
 #include "diff.h"
 
+
 namespace
 {
     enum class Mask_type {Wplus, Wmin};
@@ -657,7 +658,11 @@ void Fields<TF>::create(Input& input, Netcdf_file& input_nc)
     add_mean_profs(input_nc);
 
     // Add divergence due to open boundaries
-    add_divergence(input_nc);
+    std::string swopenbc_in = input.get_item<std::string>("boundary", "swopenbc", "", "0");
+
+    if (swopenbc_in == "1"){
+      add_divergence(input_nc);
+    }
 
     /*
     nerror += add_mean_prof(inputin, "u", mp.at("u")->data, grid.utrans);

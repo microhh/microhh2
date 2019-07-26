@@ -201,9 +201,9 @@ void Boundary<TF>::process_bcs(Input& input)
 
     std::string swopenbc_in = input.get_item<std::string>("boundary", "swopenbc", "", "0");
 
-    if (swopenbc_in == "0")
+    if (swopenbc_in == "0"){
         swopenbc = Openbc_type::disabled;
-
+      }
     else if (swopenbc_in == "1")
     {
         swopenbc = Openbc_type::enabled;
@@ -260,12 +260,13 @@ void Boundary<TF>::process_openbc(Netcdf_handle& input_nc)
             {
                 std::vector<TF> tmp(4*gd.ktot);
                 group_nc.get_variable(tmp, it+"_bc", {0,0}, {4,gd.ktot});
-                for (int n = 0; n < 4; n++)
+                for (int n = 0; n < 4; n++){
                     std::copy(tmp.begin() + n * gd.ktot, tmp.begin() + (n+1) * gd.ktot, openbc_profs[it].begin() + gd.kstart + n * gd.kcells);
+                  }
                 // Modify subsidence
 
                 // Modify initial field (done in field.cxx)
-                // Subtract utrans and vtrans, if necessary 
+                // Subtract utrans and vtrans, if necessary
             }
         }
     }
@@ -596,7 +597,7 @@ namespace
                 w[ijk+kk1] = TF(-6.)*w[ijk-kk1] + TF(4.)*w[ijk-kk2] - w[ijk-kk3];
             }
     }
-    
+
     template<typename TF>
     void calc_openbc(TF* restrict data, TF* corners,
             const int igc, const int jgc, const int itot, const int jtot, const int iend, const int jend, const int icells, const int jcells, const int kcells, const int ijcells)
@@ -675,15 +676,16 @@ void Boundary<TF>::exec(Thermo<TF>& thermo)
     boundary_cyclic.exec(fields.mp.at("v")->fld.data());
     boundary_cyclic.exec(fields.mp.at("w")->fld.data());
 
-    for (auto& it : fields.sp)
+    for (auto& it : fields.sp){
         boundary_cyclic.exec(it.second->fld.data());
-
-    if (swopenbc == Openbc_type::enabled)
+      }
+    if (swopenbc == Openbc_type::enabled){
         for (auto& it : openbc_list)
         {
             calc_openbc(fields.ap.at(it)->fld.data(), openbc_profs.at(it).data(),
                 gd.igc, gd.jgc, gd.itot, gd.jtot, gd.iend, gd.jend, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
         }
+      }
 
     // Update the boundary values.
     update_bcs(thermo);
