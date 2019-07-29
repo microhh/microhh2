@@ -634,7 +634,6 @@ void Fields<TF>::init_tmp_field_g()
 }
 #endif
 
-
 template<typename TF>
 void Fields<TF>::create(Input& input, Netcdf_file& input_nc)
 {
@@ -655,7 +654,8 @@ void Fields<TF>::create(Input& input, Netcdf_file& input_nc)
     add_vortex_pair(input);
 
     // Add the mean profiles to the fields
-    add_mean_profs(input_nc);
+
+    add_mean_profs(input,input_nc);
 
     // Add divergence due to open boundaries
     std::string swopenbc_in = input.get_item<std::string>("boundary", "swopenbc", "", "0");
@@ -777,7 +777,7 @@ namespace
 }
 
 template<typename TF>
-void Fields<TF>::add_mean_profs(Netcdf_handle& input_nc)
+void Fields<TF>::add_mean_profs(Input& input, Netcdf_handle& input_nc)
 {
     const Grid_data<TF>& gd = grid.get_grid_data();
     std::vector<TF> prof(gd.ktot);
@@ -797,12 +797,16 @@ void Fields<TF>::add_mean_profs(Netcdf_handle& input_nc)
             gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
             gd.icells, gd.ijcells);
 
+    std::string swopenbc_inp = input.get_item<std::string>("boundary", "swopenbc", "", "0");
+
     for (auto& f : sp)
     {
-        group_nc.get_variable(prof, f.first, start, count);
-        add_mean_prof_to_field<TF>(f.second->fld.data(), prof.data(), 0.,
-                gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
-                gd.icells, gd.ijcells);
+        if (f.first!="thl"||swopenbc_inp=="0") {
+          group_nc.get_variable(prof, f.first, start, count);
+          add_mean_prof_to_field<TF>(f.second->fld.data(), prof.data(), 0.,
+                  gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
+                  gd.icells, gd.ijcells);
+        }
     }
 }
 
