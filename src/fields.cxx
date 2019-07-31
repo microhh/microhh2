@@ -655,7 +655,7 @@ void Fields<TF>::create(Input& input, Netcdf_file& input_nc)
 
     // Add the mean profiles to the fields
 
-    add_mean_profs(input,input_nc);
+    add_mean_profs(input_nc);
 
     // Add divergence due to open boundaries
     std::string swopenbc_in = input.get_item<std::string>("boundary", "swopenbc", "", "0");
@@ -754,6 +754,24 @@ namespace
     }
 
     template<typename TF>
+    void subtract_mean_prof_to_field(TF* restrict const data,
+                                const TF* restrict const dataprof,
+                                const TF offset,
+                                const int istart, const int iend,
+                                const int jstart, const int jend,
+                                const int kstart, const int kend,
+                                const int jj, const int kk)
+    {
+        for (int k=kstart; k<kend; ++k)
+            for (int j=jstart; j<jend; ++j)
+                for (int i=istart; i<iend; ++i)
+                {
+                    const int ijk = i + j*jj + k*kk;
+                    data[ijk] -= dataprof[k-kstart] - offset;
+                }
+    }
+
+    template<typename TF>
     void add_divergence_to_field(TF* restrict const data,
                                 const TF* restrict const dataprof,
                                 const int istart, const int iend,
@@ -768,16 +786,16 @@ namespace
                     const int ijk = i + j*jj + k*kk;
                     TF fac_i = TF(i - istart)/TF(iend - istart);
                     TF fac_j = TF(j - jstart)/TF(jend - jstart);
-                    data[ijk] += (    fac_i) * (    fac_j) * dataprof[k - kstart           ]
-                               + (1 - fac_i) * (    fac_j) * dataprof[k - kstart + 1 * ktot]
-                               + (    fac_i) * (1 - fac_j) * dataprof[k - kstart + 2 * ktot]
-                               + (1 - fac_i) * (1 - fac_j) * dataprof[k - kstart + 3 * ktot];
+                    data[ijk] += ( 1-   fac_i) * ( 1-   fac_j) * dataprof[k - kstart           ]
+                               + ( fac_i) * (  1-  fac_j) * dataprof[k - kstart + 1 * ktot]
+                               + (   1- fac_i) * (fac_j) * dataprof[k - kstart + 2 * ktot]
+                               + ( fac_i) * ( fac_j) * dataprof[k - kstart + 3 * ktot];
                 }
     }
 }
 
 template<typename TF>
-void Fields<TF>::add_mean_profs(Input& input, Netcdf_handle& input_nc)
+void Fields<TF>::add_mean_profs(Netcdf_handle& input_nc)
 {
     const Grid_data<TF>& gd = grid.get_grid_data();
     std::vector<TF> prof(gd.ktot);
@@ -797,16 +815,12 @@ void Fields<TF>::add_mean_profs(Input& input, Netcdf_handle& input_nc)
             gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
             gd.icells, gd.ijcells);
 
-    std::string swopenbc_inp = input.get_item<std::string>("boundary", "swopenbc", "", "0");
-
     for (auto& f : sp)
     {
-        if (f.first!="thl"||swopenbc_inp=="0") {
-          group_nc.get_variable(prof, f.first, start, count);
-          add_mean_prof_to_field<TF>(f.second->fld.data(), prof.data(), 0.,
-                  gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
-                  gd.icells, gd.ijcells);
-        }
+        group_nc.get_variable(prof, f.first, start, count);
+        add_mean_prof_to_field<TF>(f.second->fld.data(), prof.data(), 0.,
+                gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
+                gd.icells, gd.ijcells);
     }
 }
 
@@ -823,6 +837,10 @@ void Fields<TF>::add_divergence(Netcdf_handle& input_nc)
 
     for (auto& f : ap)
     {
+        group_nc.get_variable(prof, f.first+"_bc", start, count);
+        subtract_mean_prof_to_field<TF>(f.second->fld.data(), prof.data(), 0.,
+                gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
+                gd.icells, gd.ijcells);
         group_nc.get_variable(prof, f.first+"_bc", start, count);
         add_divergence_to_field<TF>(f.second->fld.data(), prof.data(),
                 gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,

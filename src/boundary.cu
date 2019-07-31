@@ -252,7 +252,6 @@ namespace
         {
             const int ijk0 = i          + j*jj + k*kk;
             const int ijk1 = i+iend     + j*jj + k*kk;
-
             TF slope     = (corners[k + 2 *kcells] - corners[k + 0 *kcells]) / jtot
                          - (corners[k + 3 *kcells] - corners[k + 1 *kcells]) / jtot; //- slope_data
             TF intercept = (corners[k + 0 *kcells])
@@ -260,8 +259,8 @@ namespace
 
             data[ijk0] += slope*j + intercept;
             data[ijk1] -= slope*j + intercept;
+          }
         }
-    }
 
     template<typename TF> __global__
     void calc_openbc_y(TF* restrict data, TF* corners,
@@ -275,7 +274,7 @@ namespace
         const int jj = icells;
         const int kk = icells*jcells;
 
-        // East-west
+        // North-South
         if (k < kend && j < jgc && i < iend)
         {
             const int ijk0 = i + j           *jj + k*kk;
@@ -283,6 +282,7 @@ namespace
 
             TF slope     = (corners[k + 3 *kcells] - corners[k + 2 *kcells]) / jtot
                          - (corners[k + 1 *kcells] - corners[k + 0 *kcells]) / jtot; //- slope_data
+
             TF intercept = (corners[k + 2 *kcells])
                          - (corners[k + 0 *kcells]); //- intercept_data
 
@@ -323,7 +323,7 @@ void Boundary<TF>::exec(Thermo<TF>& thermo)
             calc_openbc_x<TF><<<gridGPU, blockGPU>>>(fields.ap.at(it)->fld_g, openbc_profs_g.at(it),
                 gd.igc, gd.jgc, gd.itot, gd.jtot, gd.istart, gd.jstart, gd.kstart, gd.iend, gd.jend, gd.kend, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
             calc_openbc_y<TF><<<gridGPU, blockGPU>>>(fields.ap.at(it)->fld_g, openbc_profs_g.at(it),
-                gd.igc, gd.jgc, gd.itot, gd.jtot, gd.iend, gd.jend, gd.istart, gd.jstart, gd.kstart, gd.kend, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
+                gd.igc, gd.jgc, gd.itot, gd.jtot, gd.istart, gd.jstart, gd.kstart, gd.iend, gd.jend, gd.kend, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
         }
 
     // Calculate the boundary values.
@@ -428,7 +428,6 @@ void Boundary<TF>::prepare_device()
             openbc_profs_g.emplace(it, nullptr);
             cuda_safe_call(cudaMalloc(&openbc_profs_g.at(it), nmemsize));
             cuda_safe_call(cudaMemcpy(openbc_profs_g.at(it), openbc_profs.at(it).data(), nmemsize, cudaMemcpyHostToDevice));
-            std::cout << "it"<< openbc_profs.at(it)[10] << "\n";
         }
     }
 }
