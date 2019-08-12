@@ -273,7 +273,7 @@ namespace
 
         const int jj = icells;
         const int kk = icells*jcells;
-
+        
         // North-South
         if (k < kend && j < jgc && i < iend)
         {

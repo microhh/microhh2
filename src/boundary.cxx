@@ -34,6 +34,8 @@
 #include "finite_difference.h"
 #include "netcdf_interface.h"
 #include <iostream>
+#include <vector>
+#include <chrono>
 
 #include "boundary_cyclic.h"
 
@@ -387,6 +389,98 @@ void Boundary<TF>::set_values()
 
 namespace
 {
+  //Given a dataset of X and Y values, this function computes the slope and
+  //and intercept of this dataset via linear regression
+  template<typename TF>
+  TF* LinReg(const int istart, const int iend,const int jstart, const int jend,
+      const int icells, const int ijcells, int k ,std::string boundary , TF* restrict data){
+
+      const int jj = icells;
+      const int kk = ijcells;
+
+      TF avg_x=0;
+      TF sum_squared_xdiff=0;
+      TF inprod_xy=0;
+      TF avg_y=0;
+
+      if (boundary=="west"){
+        int n = jend-jstart;
+        for (int j=jstart; j<jend; j++){
+          avg_x+=j;
+        }
+        avg_x /= n; //Computes the average of the x dataset
+        for (int j=jstart;j<jend;j++) {
+          const int ijkE = iend-1 + (j)*jj + k*kk;
+          avg_y+=data[ijkE];
+        }
+        avg_y/=n;
+        for (int j=jstart;j<jend;j++) {
+          const int ijkE = iend-1 + (j)*jj + k*kk;
+          inprod_xy+=(j-avg_x)*(data[ijkE]-avg_y);
+          sum_squared_xdiff+=(j-avg_x)*(j-avg_x);
+        }
+      }
+
+      else if (boundary=="east"){
+        int n = jend-jstart;
+        for (int j=jstart; j<jend; j++){
+          avg_x+=j;
+        }
+        avg_x /= n; //Computes the average of the x dataset
+        for (int j=jstart;j<jend;j++) {
+          const int ijkW = istart + (j)*jj + k*kk;
+          avg_y+=data[ijkW];
+        }
+        avg_y/=n;
+        for (int j=jstart;j<jend;j++) {
+          const int ijkW = istart + (j)*jj + k*kk;
+          inprod_xy+=(j-avg_x)*(data[ijkW]-avg_y);
+          sum_squared_xdiff+=(j-avg_x)*(j-avg_x);
+        }
+      }
+
+      else if(boundary=="north"){
+        int n = iend-istart;
+        for (int i=istart; i<iend; i++){
+          avg_x+=i;
+        }
+        avg_x /= n; //Computes the average of the x dataset
+        for (int i=istart;i<iend;i++) {
+          const int ijkS = i + (jstart)*jj + k*kk;
+          avg_y+=data[ijkS];
+        }
+        avg_y/=n;
+        for (int i=istart;i<iend;i++) {
+          const int ijkS = i + (jstart)*jj + k*kk;
+          inprod_xy+=(i-avg_x)*(data[ijkS]-avg_y);
+          sum_squared_xdiff+=(i-avg_x)*(i-avg_x);
+        }
+      }
+
+      else{
+        int n = iend-istart;
+        for (int i=istart; i<iend; i++){
+          avg_x+=i;
+        }
+        avg_x /= n; //Computes the average of the x dataset
+        for (int i=istart;i<iend;i++) {
+          const int ijkN = i + (jend-1)*jj + k*kk;
+          avg_y+=data[ijkN];
+        }
+        avg_y/=n;
+        for (int i=istart;i<iend;i++) {
+          const int ijkN = i + (jend-1)*jj + k*kk;
+          inprod_xy+=(i-avg_x)*(data[ijkN]-avg_y);
+          sum_squared_xdiff+=(i-avg_x)*(i-avg_x);
+        }
+      }
+
+      TF *parameters=new TF[2];
+      parameters[1] = inprod_xy / sum_squared_xdiff;//Slope determined by linear regression
+      parameters[0] = avg_y - parameters[1] * avg_x;// Intercept determined by linear regression
+      return parameters; //Returns a pointer to the array with the slope and intercept
+                       //of the dataset determined by linear regression
+  }
     template<typename TF>
     void calc_ghost_cells_bot_2nd(TF* const restrict a, const TF* const restrict dzh, Boundary_type boundary_type,
                                   TF* const restrict abot, TF* const restrict agradbot,
@@ -599,70 +693,120 @@ namespace
     }
 
     template<typename TF>
-    void calc_openbc(TF* restrict data, TF* corners,
-            const int igc, const int jgc, const int itot, const int jtot, const int iend, const int jend, const int kend, const int kstart, const int icells, const int jcells, const int kcells, const int ijcells)
+    void calc_openbc(TF* restrict data, TF* corners,const int xsize, const int ysize, const int dx, const int dy,
+            const int igc, const int jgc, const int itot, const int jtot, const int iend, const int jend, const int kend, const int istart,const int jstart,const int kstart, const int icells, const int jcells, const int kcells, const int ijcells)
     {
         const int jj = icells;
         const int kk = ijcells;
-        // west boundary
+
+        // west-east boundary
         for (int k=kstart; k<kend; ++k)
         {
-            TF slope     = (corners[k + 2 *kcells] - corners[k + 0 *kcells]) / jtot
-                         - (corners[k + 3 *kcells] - corners[k + 1 *kcells]) / jtot; //- slope_data
-            TF intercept = (corners[k + 0 *kcells]);
-                         - (corners[k + 1 *kcells]); //- intercept_data
-            for (int j=0; j<jcells; ++j)
+          TF *LinRegParam = LinReg(istart,iend,jstart,jend,icells,ijcells,k,"west",data);
+
+          TF slopeE=LinRegParam[1];
+          TF interceptE=LinRegParam[0];
+
+            TF DeltaSlopeW0 = (corners[k + 2 *kcells] - corners[k + 0 *kcells]) / (jtot-1)
+                        - slopeE; //- slope_data
+            TF DeltaInterceptW0 = (corners[k + 0 *kcells]-(corners[k + 2 *kcells] - corners[k + 0 *kcells])*jstart / (jtot-1))
+                        - interceptE; //- intercept_data
+            TF DeltaSlopeE1 = (corners[k + 3 *kcells] - corners[k + 1 *kcells]) / (jtot-1)
+                        - slopeE; //- slope_data
+            TF DeltaInterceptE1 = (corners[k + 1 *kcells]-(corners[k + 3 *kcells] - corners[k + 1 *kcells])*jstart / (jtot-1))
+                        - interceptE; //- intercept_data
+
+            TF *LinRegParamWD = LinReg(istart,iend,jstart,jend,icells,ijcells,k,"east",data);
+            TF slopeW=LinRegParamWD[1];
+            TF interceptW=LinRegParamWD[0];
+
+            TF DeltaSlopeE0     = (corners[k + 3 *kcells] - corners[k + 1 *kcells]) / (jtot-1)
+                           - slopeW; //- slope_data
+            TF DeltaInterceptE0 = (corners[k + 1 *kcells]-(corners[k + 3 *kcells] - corners[k + 1 *kcells])*jstart / (jtot-1))
+                           - interceptW; //- intercept_data
+
+            TF DeltaSlopeW1     = (corners[k + 2 *kcells] - corners[k + 0 *kcells]) / (jtot-1)
+                           - slopeW; //- slope_data
+            TF DeltaInterceptW1 = (corners[k + 0 *kcells]-(corners[k + 2 *kcells] - corners[k + 0 *kcells])*jstart / (jtot-1))
+                           - interceptW; //- intercept_data
+
+            for (int j=0; j<jcells; ++j){
                 #pragma ivdep
                 for (int i=0; i<igc; ++i)
                 {
-                    const int ijk0 = i + j*jj + k*kk;
-                    data[ijk0] += slope*j + intercept;
+                    const int ijkW0 = i + j*jj + k*kk;
+                    const int ijkE0 = i + iend + j*jj + k*kk;
+                    data[ijkW0] += DeltaSlopeW0*j + DeltaInterceptW0;
+                    data[ijkE0] += DeltaSlopeE0*j + DeltaInterceptE0;
                 }
-        }
-        // east boundary
-        for (int k=kstart; k<kend; ++k)
-        {
-            TF slope     = (corners[k + 3 *kcells] - corners[k + 1 *kcells]) / jtot
-                         - (corners[k + 2 *kcells] - corners[k + 0 *kcells]) / jtot; //- slope_data
-            TF intercept = (corners[k + 1 *kcells]);
-                         - (corners[k + 0 *kcells]); //- intercept_data
-            for (int j=0; j<jcells; ++j)
+              }
+
+            for (int j=jstart; j<jend; ++j){
                 #pragma ivdep
-                for (int i=0; i<igc; ++i)
-                {
-                    const int ijk0 = i + iend + j*jj + k*kk;
-                    data[ijk0] += slope*j + intercept;
+                  {
+                    const int ijkE1 = iend-1 + j*jj + k*kk;
+                    const int ijkW1 = istart + j*jj + k*kk;
+                    data[ijkE1] += DeltaSlopeE1*j + DeltaInterceptE1;
+                    data[ijkW1] += DeltaSlopeW1*j + DeltaInterceptW1;
+                    }
                 }
         }
-        // north boundary
+
+        // north-south boundary
         for (int k=kstart; k<kend; ++k)
         {
-            TF slope     = (corners[k + 3 *kcells] - corners[k + 2 *kcells]) / jtot
-                         - (corners[k + 1 *kcells] - corners[k + 0 *kcells]) / jtot; //- slope_data
-            TF intercept = (corners[k + 2 *kcells])
-                         - (corners[k + 0 *kcells]); //- intercept_data
-            for (int j=0; j<jgc; ++j)
+          TF *LinRegParam = LinReg(istart,iend,jstart,jend,icells,ijcells,k,"north",data);
+          TF slopeS=LinRegParam[1];
+          TF interceptS=LinRegParam[0];
+            TF DeltaSlopeN0 = (corners[k + 3 *kcells] - corners[k + 2 *kcells]) / (itot-1)
+                         - slopeS; //- slope_data
+
+            TF DeltaInterceptN0 = (corners[k + 2 *kcells]-(corners[k + 3 *kcells] - corners[k + 2 *kcells])*istart / (itot-1))
+                         - interceptS; //- intercept_data
+            TF DeltaSlopeS1   = (corners[k + 1 *kcells] - corners[k + 0 *kcells]) / (itot-3)
+                                      - slopeS; //- slope_data
+            TF DeltaInterceptS1 = (corners[k + 0 *kcells]-(corners[k + 1 *kcells] - corners[k + 0 *kcells])*istart / (itot-3))
+                                      - interceptS; //- intercept_data
+
+              std::vector<float> DataValuesND={};
+              for (float i=istart;i<iend;i++) {
+                const int ijkN = i + (jend-1)*jj + k*kk;
+                DataValuesND.push_back(data[ijkN]);
+              }
+              TF *LinRegParamND = LinReg(istart,iend,jstart,jend,icells,ijcells,k,"south",data);
+              TF slopeN=LinRegParamND[1];
+              TF interceptN=LinRegParamND[0];
+
+              TF DeltaSlopeS0 = (corners[k + 1 *kcells] - corners[k + 0 *kcells]) / (itot-1)
+                           - slopeN; //- slope_data
+              TF DeltaInterceptS0 = (corners[k + 0 *kcells]-(corners[k + 1 *kcells] - corners[k + 0 *kcells])*istart / (itot-1))
+                           - interceptN; //- intercept_data
+              TF DeltaSlopeN1 = (corners[k + 3 *kcells] - corners[k + 2 *kcells]) / (itot-3)
+                           - slopeN; //- slope_data
+              TF DeltaInterceptN1 = (corners[k + 2 *kcells]-(corners[k + 3 *kcells] - corners[k + 2 *kcells])*istart / (itot-3))
+                           - interceptN; //- intercept_data
+
+              for (int j=0; j<jgc; ++j){
                 #pragma ivdep
                 for (int i=0; i<icells; ++i)
                 {
-                    const int ijk0 = i + j *jj + k*kk;
-                    data[ijk0] += slope*i + intercept;
+                    const int ijkN0 = i + (j+jend)*jj + k*kk;
+                    const int ijkS0 = i + (j)*jj + k*kk;
+                    data[ijkN0] += DeltaSlopeN0*i + DeltaInterceptN0;
+                    data[ijkS0] += DeltaSlopeS0*i + DeltaInterceptS0;
                 }
-        }
-        // south boundary
-        for (int k=kstart; k<kend; ++k)
-        {
-            TF slope     = (corners[k + 1 *kcells] - corners[k + 0 *kcells]) / jtot
-                         - (corners[k + 3 *kcells] - corners[k + 2 *kcells]) / jtot; //- slope_data
-            TF intercept = (corners[k + 0 *kcells])
-                         - (corners[k + 2 *kcells]); //- intercept_data
-            for (int j=0; j<jgc; ++j)
+              }
+              for (int i=istart+1; i<iend-1; ++i){
                 #pragma ivdep
-                for (int i=0; i<icells; ++i)
                 {
-                    const int ijk0 = i + (j+jend  )*jj + k*kk;
-                    data[ijk0] += slope*i + intercept;
+                    const int ijkS1 = i+(jstart)*jj + k*kk;
+                    const int ijkN1 = i+(jend-1)*jj + k*kk;
+                    data[ijkS1] += DeltaSlopeS1*i + DeltaInterceptS1;
+                    data[ijkN1] += DeltaSlopeN1*i + DeltaInterceptN1;
                 }
+              }
+
+
         }
     }
 }
@@ -672,21 +816,20 @@ template<typename TF>
 void Boundary<TF>::exec(Thermo<TF>& thermo)
 {
     const Grid_data<TF>& gd = grid.get_grid_data();
-    boundary_cyclic.exec(fields.mp.at("u")->fld.data());
-    boundary_cyclic.exec(fields.mp.at("v")->fld.data());
-    boundary_cyclic.exec(fields.mp.at("w")->fld.data());
-    for (auto& it : fields.sp){
-        boundary_cyclic.exec(it.second->fld.data());
-      }
-
-    if (swopenbc == Openbc_type::enabled){
-        for (auto& it : openbc_list)
-        {
-            calc_openbc(fields.ap.at(it)->fld.data(), openbc_profs.at(it).data(),
-                gd.igc, gd.jgc, gd.itot, gd.jtot, gd.iend, gd.jend, gd.kend,gd.kstart, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
+      boundary_cyclic.exec(fields.mp.at("u")->fld.data());
+      boundary_cyclic.exec(fields.mp.at("v")->fld.data());
+      boundary_cyclic.exec(fields.mp.at("w")->fld.data());
+      for (auto& it : fields.sp){
+          boundary_cyclic.exec(it.second->fld.data());
         }
-      }
 
+      if (swopenbc == Openbc_type::enabled){
+          for (auto& it : openbc_list)
+          {
+              calc_openbc(fields.ap.at(it)->fld.data(), openbc_profs.at(it).data(),gd.xsize,gd.ysize,gd.dx,gd.dy,
+                  gd.igc, gd.jgc, gd.itot, gd.jtot, gd.iend, gd.jend, gd.kend, gd.istart, gd.jstart,gd.kstart, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
+          }
+        }
     // Update the boundary values.
     update_bcs(thermo);
 
