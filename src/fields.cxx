@@ -661,7 +661,7 @@ void Fields<TF>::create(Input& input, Netcdf_file& input_nc)
     std::string swopenbc_in = input.get_item<std::string>("boundary", "swopenbc", "", "0");
 
     if (swopenbc_in == "1"){
-      add_divergence(input_nc);
+      add_divergence(input,input_nc);
     }
 
     /*
@@ -812,7 +812,7 @@ void Fields<TF>::add_mean_profs(Input& input, Netcdf_handle& input_nc)
 }
 
 template<typename TF>
-void Fields<TF>::add_divergence(Netcdf_handle& input_nc)
+void Fields<TF>::add_divergence(Input& input, Netcdf_handle& input_nc)
 {
     const Grid_data<TF>& gd = grid.get_grid_data();
     std::vector<TF> prof(4 * gd.ktot);
@@ -822,12 +822,16 @@ void Fields<TF>::add_divergence(Netcdf_handle& input_nc)
 
     Netcdf_group& group_nc = input_nc.get_group("init");
 
+    openbc_list = input.get_list<std::string>("boundary", "openbc_list", "", std::vector<std::string>());
+
     for (auto& f : ap)
     {
+      if (std::find(openbc_list.begin(), openbc_list.end(), f.first) != openbc_list.end()){
         group_nc.get_variable(prof, f.first+"_bc", start, count);
         add_divergence_to_field<TF>(f.second->fld.data(), prof.data(),
                 gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
                 gd.icells, gd.ijcells, gd.ktot);
+        }
     }
 }
 
