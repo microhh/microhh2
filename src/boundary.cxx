@@ -794,7 +794,6 @@ void Boundary<TF>::exec(Thermo<TF>& thermo)
             boundary_cyclic.exec(it.second->fld.data());
             }
         }
-
       for (auto& it : fields.sp){
         /*Include if statement to ensure that the cyclic bc happens before open_bc, only when openbc is enabled
         (first part of if statement) and only for the fields in open_bc_list (second part of if statement checks
@@ -807,7 +806,7 @@ void Boundary<TF>::exec(Thermo<TF>& thermo)
       if (swopenbc == Openbc_type::enabled){
           for (auto& it : openbc_list)
           {
-              calc_openbc(fields.ap.at(it)->fld.data(), openbc_profs.at(it).data(),gd.xsize,gd.ysize,gd.dx,gd.dy,
+              calc_openbc(fields.sp.at("thl")->fld.data(), openbc_profs.at(it).data(),gd.xsize,gd.ysize,gd.dx,gd.dy,
                   gd.igc, gd.jgc, gd.itot, gd.jtot, gd.iend, gd.jend, gd.kend, gd.istart, gd.jstart,gd.kstart, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
           }
         }

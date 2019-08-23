@@ -149,6 +149,7 @@ class Fields
         Field3d_operators<TF> field3d_operators;
 
         bool calc_mean_profs;
+        std::vector<std::string> openbc_list;
 
         int n_tmp_fields;   ///< Number of temporary fields.
 
@@ -185,8 +186,8 @@ class Fields
         int vortexnpair;
         std::string vortexaxis;
 
-        void add_mean_profs(Netcdf_handle&);
-        void add_divergence(Netcdf_handle&);
+        void add_mean_profs(Input&, Netcdf_handle&);
+        void add_divergence(Input&, Netcdf_handle&);
         // int add_mean_prof(Input*, std::string, double*, double);
         void randomize(Input&, std::string, TF* const restrict);
         void add_vortex_pair(Input&);

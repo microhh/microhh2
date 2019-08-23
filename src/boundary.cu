@@ -327,58 +327,52 @@ namespace
                          //of the dataset determined by linear regression
     }
     template<typename TF> __global__
-    void calc_openbc_x(TF* restrict data, TF* corners,
-            const int igc, const int jgc, const int itot, const int jtot, const int istart, const int jstart, const int kstart, const int iend, const int jend, const int kend,
-             const int icells, const int jcells, const int kcells, const int ijcells)
+    void calc_regression(TF* restrict data, TF* corner0, TF* corner1, TF slope_data, TF intercept_data,
+            const int i, const int jstart, const int kstart, const int icells, const int ijcells)
     {
-        const int i = blockIdx.x*blockDim.x + threadIdx.x + istart;
+
+        if (k < kend && j < jend)
+        {
+            const int ijk = i          + j*icells + k*ijcells;
+            TF slope     = (corner1[k] - corner0[k]) / jtot - slope_data
+            TF intercept = (corner0[k]) - intercept_data
+
+            data[ijk] += slope*j + intercept;
+        }
+    }
+    template<typename TF> __global__
+    void calc_openbc_EW(TF* restrict data, TF* corner0, TF* corner1, TF slope_data, TF intercept_data,
+            const int i, const int jstart, const int kstart, const int icells, const int ijcells)
+    {
         const int j = blockIdx.y*blockDim.y + threadIdx.y + jstart;
         const int k = blockIdx.z + kstart;
 
-        const int jj = icells;
-        const int kk = ijcells;
+        if (k < kend && j < jend)
         
-        // East-west
-        if (k < kend && j < jend && i < igc)
         {
-            const int ijk0 = i          + j*jj + k*kk;
-            const int ijk1 = i+iend     + j*jj + k*kk;
-            TF slope     = (corners[k + 2 *kcells] - corners[k + 0 *kcells]) / jtot
-                         - (corners[k + 3 *kcells] - corners[k + 1 *kcells]) / jtot; //- slope_data
-            TF intercept = (corners[k + 0 *kcells])
-                         - (corners[k + 1 *kcells]); //- intercept_data
+            const int ijk = i          + j*icells + k*ijcells;
+            TF slope     = (corner1[k] - corner0[k]) / jtot - slope_data
+            TF intercept = (corner0[k]) - intercept_data
 
-            data[ijk0] += slope*j + intercept;
-            data[ijk1] -= slope*j + intercept;
-          }
+            data[ijk] += slope*j + intercept;
         }
+    }
 
     template<typename TF> __global__
-    void calc_openbc_y(TF* restrict data, TF* corners,
-            const int igc, const int jgc, const int itot, const int jtot, const int istart, const int jstart, const int kstart, const int iend, const int jend, const int kend,
-            const int icells, const int jcells, const int kcells, const int ijcells)
+    void calc_openbc_NS(TF* restrict data, TF* corner0, TF* corner1, TF slope_data, TF intercept_data,
+            const int j, const int istart, const int kstart, const int icells, const int ijcells)
     {
         const int i = blockIdx.x*blockDim.x + threadIdx.x + istart;
-        const int j = blockIdx.y*blockDim.y + threadIdx.y + jstart;
         const int k = blockIdx.z + kstart;
 
-        const int jj = icells;
-        const int kk = icells*jcells;
+        if (k < kend && i < iend)
 
-        // North-South
-        if (k < kend && j < jgc && i < iend)
         {
-            const int ijk0 = i + j           *jj + k*kk;
-            const int ijk1 = i + (j+jend  )  *jj + k*kk;
+            const int ijk = i          + j*icells + k*ijcells;
+            TF slope     = (corner1[k] - corner0[k]) / itot - slope_data
+            TF intercept = (corner0[k]) - intercept_data
 
-            TF slope     = (corners[k + 3 *kcells] - corners[k + 2 *kcells]) / jtot
-                         - (corners[k + 1 *kcells] - corners[k + 0 *kcells]) / jtot; //- slope_data
-
-            TF intercept = (corners[k + 2 *kcells])
-                         - (corners[k + 0 *kcells]); //- intercept_data
-
-            data[ijk0] += slope * i + intercept;
-            data[ijk1] -= slope * i + intercept;
+            data[ijk] += slope*i + intercept;
         }
     }
 
@@ -397,9 +391,13 @@ void Boundary<TF>::exec(Thermo<TF>& thermo)
 
     dim3 grid2dGPU (gridi, gridj);
     dim3 block2dGPU(blocki, blockj);
+    dim3 grid2dGPU (gridi, gridj);
+    dim3 block2dGPU(blocki, blockj);
 
-    dim3 gridGPU (gridi, gridj, gd.kcells);
-    dim3 blockGPU(blocki, blockj, 1);
+    dim3 gridxzGPU (gridi, gd.kcells);
+    dim3 blockxzGPU(blocki, 1);
+    dim3 gridyzGPU (gridj, gd.kcells);
+    dim3 blockyzGPU(blockj, 1);
     // Cyclic boundary conditions, do this before the bottom BC's.
     boundary_cyclic.exec_g(fields.mp.at("u")->fld_g);
     boundary_cyclic.exec_g(fields.mp.at("v")->fld_g);
@@ -411,10 +409,30 @@ void Boundary<TF>::exec(Thermo<TF>& thermo)
     if (swopenbc == Openbc_type::enabled)
         for (auto& it : openbc_list)
         {
-            calc_openbc_x<TF><<<gridGPU, blockGPU>>>(fields.ap.at(it)->fld_g, openbc_profs_g.at(it),
-                gd.igc, gd.jgc, gd.itot, gd.jtot, gd.istart, gd.jstart, gd.kstart, gd.iend, gd.jend, gd.kend, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
-            calc_openbc_y<TF><<<gridGPU, blockGPU>>>(fields.ap.at(it)->fld_g, openbc_profs_g.at(it),
-                gd.igc, gd.jgc, gd.itot, gd.jtot, gd.istart, gd.jstart, gd.kstart, gd.iend, gd.jend, gd.kend, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
+            // West
+            for (int i=0; i<=igc; ++i)
+            {
+                calc_openbc_EW<TF><<<gridyzGPU, blockyzGPU>>>(fields.ap.at(it)->fld_g, openbc_profs_g.at(it)->data[0*gd.kcells], openbc_profs_g.at(it)->data[2*gd.kcells], slope, intercept,
+                    i, gd.jstart, gd.kstart, gd.icells, gd.ijcells)
+            }
+            // East
+            for (int i=0; i<=igc; ++i)
+            {
+                calc_openbc_EW<TF><<<gridyzGPU, blockyzGPU>>>(fields.ap.at(it)->fld_g, openbc_profs_g.at(it)->data[1*gd.kcells], openbc_profs_g.at(it)->data[3*gd.kcells], slope, intercept,
+                  i, gd.jstart, gd.kstart, gd.icells, gd.ijcells)
+            }
+            // South
+            for (int j=0; j<=jgc; ++j)
+            {
+                calc_openbc_NS<TF><<<gridxzGPU, blockxzGPU>>>(fields.ap.at(it)->fld_g, openbc_profs_g.at(it)->data[0*gd.kcells], openbc_profs_g.at(it)->data[1*gd.kcells], slope, intercept,
+                    j, gd.istart, gd.kstart, gd.icells, gd.ijcells)
+            }
+            // North
+            for (int j=0; j<=jgc; ++j)
+            {
+                calc_openbc_NS<TF><<<gridxzGPU, blockxzGPU>>>(fields.ap.at(it)->fld_g, openbc_profs_g.at(it)->data[2*gd.kcells], openbc_profs_g.at(it)->data[3*gd.kcells], slope, intercept,
+                    j, gd.istart, gd.kstart, gd.icells, gd.ijcells)
+            }
         }
 
     // Calculate the boundary values.
