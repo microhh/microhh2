@@ -234,7 +234,98 @@ namespace
         }
     }
 
+    //Given a dataset of X and Y values, this function computes the slope and
+    //and intercept of this dataset via linear regression
+    template<typename TF> __global__
+    TF* LinReg(const int istart, const int iend,const int jstart, const int jend,
+        const int icells, const int ijcells, int k ,std::string boundary , TF* restrict data){
 
+        const int jj = icells;
+        const int kk = ijcells;
+
+        TF avg_x=0;
+        TF sum_squared_xdiff=0;
+        TF inprod_xy=0;
+        TF avg_y=0;
+
+        if (boundary=="west"){
+          int n = jend-jstart;
+          for (int j=jstart; j<jend; j++){
+            avg_x+=j;
+          }
+          avg_x /= n; //Computes the average of the x dataset
+          for (int j=jstart;j<jend;j++) {
+            const int ijkE = iend-1 + (j)*jj + k*kk;
+            avg_y+=data[ijkE];
+          }
+          avg_y/=n;
+          for (int j=jstart;j<jend;j++) {
+            const int ijkE = iend-1 + (j)*jj + k*kk;
+            inprod_xy+=(j-avg_x)*(data[ijkE]-avg_y);
+            sum_squared_xdiff+=(j-avg_x)*(j-avg_x);
+          }
+        }
+
+        else if (boundary=="east"){
+          int n = jend-jstart;
+          for (int j=jstart; j<jend; j++){
+            avg_x+=j;
+          }
+          avg_x /= n; //Computes the average of the x dataset
+          for (int j=jstart;j<jend;j++) {
+            const int ijkW = istart + (j)*jj + k*kk;
+            avg_y+=data[ijkW];
+          }
+          avg_y/=n;
+          for (int j=jstart;j<jend;j++) {
+            const int ijkW = istart + (j)*jj + k*kk;
+            inprod_xy+=(j-avg_x)*(data[ijkW]-avg_y);
+            sum_squared_xdiff+=(j-avg_x)*(j-avg_x);
+          }
+        }
+
+        else if(boundary=="north"){
+          int n = iend-istart;
+          for (int i=istart; i<iend; i++){
+            avg_x+=i;
+          }
+          avg_x /= n; //Computes the average of the x dataset
+          for (int i=istart;i<iend;i++) {
+            const int ijkS = i + (jstart)*jj + k*kk;
+            avg_y+=data[ijkS];
+          }
+          avg_y/=n;
+          for (int i=istart;i<iend;i++) {
+            const int ijkS = i + (jstart)*jj + k*kk;
+            inprod_xy+=(i-avg_x)*(data[ijkS]-avg_y);
+            sum_squared_xdiff+=(i-avg_x)*(i-avg_x);
+          }
+        }
+
+        else{
+          int n = iend-istart;
+          for (int i=istart; i<iend; i++){
+            avg_x+=i;
+          }
+          avg_x /= n; //Computes the average of the x dataset
+          for (int i=istart;i<iend;i++) {
+            const int ijkN = i + (jend-1)*jj + k*kk;
+            avg_y+=data[ijkN];
+          }
+          avg_y/=n;
+          for (int i=istart;i<iend;i++) {
+            const int ijkN = i + (jend-1)*jj + k*kk;
+            inprod_xy+=(i-avg_x)*(data[ijkN]-avg_y);
+            sum_squared_xdiff+=(i-avg_x)*(i-avg_x);
+          }
+        }
+
+        TF *parameters=new TF[2];
+        parameters[1] = inprod_xy / sum_squared_xdiff;//Slope determined by linear regression
+        parameters[0] = avg_y - parameters[1] * avg_x;// Intercept determined by linear regression
+        return parameters; //Returns a pointer to the array with the slope and intercept
+                         //of the dataset determined by linear regression
+    }
     template<typename TF> __global__
     void calc_openbc_x(TF* restrict data, TF* corners,
             const int igc, const int jgc, const int itot, const int jtot, const int istart, const int jstart, const int kstart, const int iend, const int jend, const int kend,
@@ -246,7 +337,7 @@ namespace
 
         const int jj = icells;
         const int kk = ijcells;
-
+        
         // East-west
         if (k < kend && j < jend && i < igc)
         {
@@ -273,7 +364,7 @@ namespace
 
         const int jj = icells;
         const int kk = icells*jcells;
-        
+
         // North-South
         if (k < kend && j < jgc && i < iend)
         {

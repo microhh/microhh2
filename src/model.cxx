@@ -183,6 +183,7 @@ void Model<TF>::init()
     column->init(timeloop->get_ifactor());
     cross->init(timeloop->get_ifactor());
     dump->init(timeloop->get_ifactor());
+
 }
 
 template<typename TF>

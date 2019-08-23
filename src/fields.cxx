@@ -786,8 +786,8 @@ void Fields<TF>::add_mean_profs(Input& input, Netcdf_handle& input_nc)
     const std::vector<int> count = {gd.ktot};
 
     Netcdf_group& group_nc = input_nc.get_group("init");
-    group_nc.get_variable(prof, "u", start, count);
 
+    group_nc.get_variable(prof, "u", start, count);
     add_mean_prof_to_field<TF>(mp.at("u")->fld.data(), prof.data(), grid.utrans,
             gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
             gd.icells, gd.ijcells);
@@ -801,7 +801,7 @@ void Fields<TF>::add_mean_profs(Input& input, Netcdf_handle& input_nc)
     std::string swopenbc_in = input.get_item<std::string>("boundary", "swopenbc", "", "0");
 
     for (auto& f : sp)
-    {
+    {/*Only adding mean profs to fields that are not in openbc_list or to all when openbc disabled*/
       if (!(std::find(openbc_list.begin(), openbc_list.end(), f.first) != openbc_list.end()) || swopenbc_in == "0"){
         group_nc.get_variable(prof, f.first, start, count);
         add_mean_prof_to_field<TF>(f.second->fld.data(), prof.data(), 0.,
@@ -826,6 +826,7 @@ void Fields<TF>::add_divergence(Input& input, Netcdf_handle& input_nc)
 
     for (auto& f : ap)
     {
+      /*Only adding divergence to the fields in openbc_list*/
       if (std::find(openbc_list.begin(), openbc_list.end(), f.first) != openbc_list.end()){
         group_nc.get_variable(prof, f.first+"_bc", start, count);
         add_divergence_to_field<TF>(f.second->fld.data(), prof.data(),
