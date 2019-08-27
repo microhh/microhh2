@@ -609,6 +609,8 @@ namespace
         // West boundary
         for (int k=kstart; k<kend; ++k)
         {
+          if (corners[k]<-1e10)
+            continue;
           int n=jend-jstart;
           #pragma ivdep
           /*We impose the gradient on the qhost cells and the first grid cells, which is why
@@ -652,6 +654,8 @@ namespace
 
         for (int k=kstart; k<kend; ++k)
         {
+            if (corners[k]<-1e10)
+              continue;
           int n=jend-jstart;
           #pragma ivdep
           for(int i=0;i<igc+1;i++){
@@ -689,6 +693,8 @@ namespace
         // North boundary
         for (int k=kstart; k<kend; ++k)
         {
+            if (corners[k]<-1e10)
+              continue;
           int n=iend-istart;
           #pragma ivdep
           for(int j=0;j<jgc+1;j++){
@@ -737,6 +743,8 @@ namespace
         //South boundary
         for (int k=kstart; k<kend; ++k)
         {
+            if (corners[k]<-1e10)
+              continue;
           int n=iend-istart;
           #pragma ivdep
           for(int j=0;j<jgc+1;j++){
@@ -786,34 +794,34 @@ template<typename TF>
 void Boundary<TF>::exec(Thermo<TF>& thermo)
 {
       const Grid_data<TF>& gd = grid.get_grid_data();
-      /*We now want to apply the cyclic boundary conditions to the rest of the fields. If openbc is disabled,
-      then no fields were updated previously, so update all the fields. On the other hand, if openbc is enabled,
-      then fields in openbc_list were already updated, so only update the ones that are not in openbc_list.*/
-      for (auto& it : fields.sp){
-          if (swopenbc == Openbc_type::disabled||!(std::find(openbc_list.begin(), openbc_list.end(), it.first) != openbc_list.end())){
-            boundary_cyclic.exec(it.second->fld.data());
-            }
-        }
-      for (auto& it : fields.sp){
-        /*Include if statement to ensure that the cyclic bc happens before open_bc, only when openbc is enabled
-        (first part of if statement) and only for the fields in open_bc_list (second part of if statement checks
-        if it is in openbc_list)*/
-          if (swopenbc == Openbc_type::enabled && (std::find(openbc_list.begin(), openbc_list.end(), it.first) != openbc_list.end())){
-            boundary_cyclic.exec(it.second->fld.data());
-          }
-        }
-      /*If openbc is enabled, then perform the code to compute the openbc only for the items in openbc_list*/
-      if (swopenbc == Openbc_type::enabled){
-          for (auto& it : openbc_list)
-          {
-              calc_openbc(fields.sp.at("thl")->fld.data(), openbc_profs.at(it).data(),gd.xsize,gd.ysize,gd.dx,gd.dy,
-                  gd.igc, gd.jgc, gd.itot, gd.jtot, gd.iend, gd.jend, gd.kend, gd.istart, gd.jstart,gd.kstart, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
-          }
-        }
       /*Execute the cyclic boundary part for the velocities*/
       boundary_cyclic.exec(fields.mp.at("u")->fld.data());
       boundary_cyclic.exec(fields.mp.at("v")->fld.data());
       boundary_cyclic.exec(fields.mp.at("w")->fld.data());
+      /*We now want to apply the cyclic boundary conditions to the rest of the fields. If openbc is disabled,
+      then no fields were updated previously, so update all the fields. On the other hand, if openbc is enabled,
+      then fields in openbc_list were already updated, so only update the ones that are not in openbc_list.*/
+      for (auto& it : fields.sp){
+          // if (swopenbc == Openbc_type::disabled||!(std::find(openbc_list.begin(), openbc_list.end(), it.first) != openbc_list.end())){
+            boundary_cyclic.exec(it.second->fld.data());
+            // }
+        }
+      // for (auto& it : fields.sp){
+      //   /*Include if statement to ensure that the cyclic bc happens before open_bc, only when openbc is enabled
+      //   (first part of if statement) and only for the fields in open_bc_list (second part of if statement checks
+      //   if it is in openbc_list)*/
+      //     if (swopenbc == Openbc_type::enabled && (std::find(openbc_list.begin(), openbc_list.end(), it.first) != openbc_list.end())){
+      //       boundary_cyclic.exec(it.second->fld.data());
+      //     }
+      //   }
+      /*If openbc is enabled, then perform the code to compute the openbc only for the items in openbc_list*/
+      if (swopenbc == Openbc_type::enabled){
+          for (auto& it : openbc_list)
+          {
+              calc_openbc(fields.ap.at(it)->fld.data(), openbc_profs.at(it).data(),gd.xsize,gd.ysize,gd.dx,gd.dy,
+                  gd.igc, gd.jgc, gd.itot, gd.jtot, gd.iend, gd.jend, gd.kend, gd.istart, gd.jstart,gd.kstart, gd.icells, gd.jcells, gd.kcells, gd.ijcells);
+          }
+        }
 
 
     // Update the boundary values.

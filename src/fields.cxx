@@ -756,23 +756,31 @@ namespace
     template<typename TF>
     void add_divergence_to_field(TF* restrict const data,
                                 const TF* restrict const dataprof,
+                                const TF* restrict const meanprof,
                                 const int istart, const int iend,
                                 const int jstart, const int jend,
                                 const int kstart, const int kend,
                                 const int jj, const int kk, const int ktot)
     {
         for (int k=kstart; k<kend; ++k)
-            for (int j=jstart; j<jend; ++j)
-                for (int i=istart; i<iend; ++i)
-                {
-                    const int ijk = i + j*jj + k*kk;
-                    TF fac_i = TF(i - istart)/TF(iend - istart);
-                    TF fac_j = TF(j - jstart)/TF(jend - jstart);
-                    data[ijk] += ( 1 -  fac_i) * ( 1 -  fac_j) * dataprof[k - kstart           ]
-                               + (      fac_i) * ( 1 -  fac_j) * dataprof[k - kstart + 1 * ktot]
-                               + ( 1 -  fac_i) * (      fac_j) * dataprof[k - kstart + 2 * ktot]
-                               + (      fac_i) * (      fac_j) * dataprof[k - kstart + 3 * ktot];
-                }
+        {
+            if (dataprof[k-kstart]>-1e10)
+            {
+                int ijk;
+                for (int j=jstart; j<jend; ++j)
+                    for (int i=istart; i<iend; ++i)
+                    {
+                        ijk = i + j*jj + k*kk;
+                        TF fac_i = TF(i - istart)/TF(iend - istart);
+                        TF fac_j = TF(j - jstart)/TF(jend - jstart);
+                        data[ijk] += -meanprof[k - kstart]
+                                   + ( 1 -  fac_i) * ( 1 -  fac_j) * dataprof[k - kstart           ]
+                                   + (      fac_i) * ( 1 -  fac_j) * dataprof[k - kstart + 1 * ktot]
+                                   + ( 1 -  fac_i) * (      fac_j) * dataprof[k - kstart + 2 * ktot]
+                                   + (      fac_i) * (      fac_j) * dataprof[k - kstart + 3 * ktot];
+                    }
+            }
+        }
     }
 }
 
@@ -801,13 +809,11 @@ void Fields<TF>::add_mean_profs(Input& input, Netcdf_handle& input_nc)
     std::string swopenbc_in = input.get_item<std::string>("boundary", "swopenbc", "", "0");
 
     for (auto& f : sp)
-    {/*Only adding mean profs to fields that are not in openbc_list or to all when openbc disabled*/
-      if (!(std::find(openbc_list.begin(), openbc_list.end(), f.first) != openbc_list.end()) || swopenbc_in == "0"){
+    {
         group_nc.get_variable(prof, f.first, start, count);
         add_mean_prof_to_field<TF>(f.second->fld.data(), prof.data(), 0.,
                 gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
                 gd.icells, gd.ijcells);
-        }
     }
 }
 
@@ -816,6 +822,7 @@ void Fields<TF>::add_divergence(Input& input, Netcdf_handle& input_nc)
 {
     const Grid_data<TF>& gd = grid.get_grid_data();
     std::vector<TF> prof(4 * gd.ktot);
+    std::vector<TF> prof_mn (gd.ktot);
 
     const std::vector<int> start = {0,0};
     const std::vector<int> count = {4,gd.ktot};
@@ -827,11 +834,13 @@ void Fields<TF>::add_divergence(Input& input, Netcdf_handle& input_nc)
     for (auto& f : ap)
     {
       /*Only adding divergence to the fields in openbc_list*/
-      if (std::find(openbc_list.begin(), openbc_list.end(), f.first) != openbc_list.end()){
-        group_nc.get_variable(prof, f.first+"_bc", start, count);
-        add_divergence_to_field<TF>(f.second->fld.data(), prof.data(),
-                gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
-                gd.icells, gd.ijcells, gd.ktot);
+      if (std::find(openbc_list.begin(), openbc_list.end(), f.first) != openbc_list.end())
+      {
+          group_nc.get_variable(prof, f.first+"_bc", start, count);
+          group_nc.get_variable(prof_mn, f.first, {0}, {gd.ktot});
+          add_divergence_to_field<TF>(f.second->fld.data(), prof.data(), prof_mn.data(),
+             gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
+             gd.icells, gd.ijcells, gd.ktot);
         }
     }
 }
