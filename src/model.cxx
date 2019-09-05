@@ -330,7 +330,7 @@ void Model<TF>::exec()
                 diff->exec(*stats);
 
                 // Calculate the thermodynamics and the buoyancy tendency.
-                thermo->exec(timeloop->get_sub_time_step(), *stats);
+                thermo->exec(timeloop->get_dt(), *stats);
 
                 // Calculate the microphysics.
                 microphys->exec(*thermo, timeloop->get_dt(), *stats);

@@ -818,21 +818,71 @@ void Thermo_moist<TF>::create(Input& inputin, Netcdf_handle& input_nc, Stats<TF>
     create_cross(cross);
 }
 
+namespace
+{
+    template<typename TF>
+    void compression_expansion_base_state(
+            TF* const restrict st, const TF* const restrict s,
+            const TF* const restrict w_ls, const TF* const dzi,
+            const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
+            const int jj, const int kk)
+    {
+        for (int k=kstart; k<kend; ++k)
+        {
+            const TF ws_bot = w_ls[k  ] * 0.5*(s[k-1] + s[k  ]);
+            const TF ws_top = w_ls[k+1] * 0.5*(s[k  ] + s[k+1]);
+            const TF s_tend = - (ws_top - ws_bot) * dzi[k];
+
+            for (int j=jstart; j<jend; ++j)
+                for (int i=istart; i<iend; ++i)
+                {
+                    const int ijk = i + j*jj + k*kk;
+                    st[ijk] += s_tend;
+                }
+        }
+    }
+}
+
 #ifndef USECUDA
 template<typename TF>
 void Thermo_moist<TF>::exec(const double dt, Stats<TF>& stats)
 {
     auto& gd = grid.get_grid_data();
 
+    static int counter = 0;
+
     // Re-calculate hydrostatic pressure and exner, pass dummy as thvref to prevent overwriting base state
     auto tmp = fields.get_tmp();
-    if (bs.swupdatebasestate)
+    if (bs.swupdatebasestate && counter == 1)
     {
-        calc_base_state(bs.pref.data(), bs.prefh.data(),
-                        bs.rhoref.data(), bs.rhorefh.data(), &tmp->fld[0*gd.kcells], &tmp->fld[1*gd.kcells],
-                        bs.exnref.data(), bs.exnrefh.data(), fields.sp.at("thl")->fld_mean.data(), fields.sp.at("qt")->fld_mean.data(),
-                        bs.pbot, gd.kstart, gd.kend, gd.z.data(), gd.dz.data(), gd.dzh.data());
+        // Copy the base state in order to calculate compression velocity.
+        std::vector<TF> rhoref0(bs.rhoref);
+        std::vector<TF> w_ls(gd.kcells);
+
+        calc_base_state(
+                bs.pref.data(), bs.prefh.data(),
+                bs.rhoref.data(), bs.rhorefh.data(), &tmp->fld[0*gd.kcells], &tmp->fld[1*gd.kcells],
+                bs.exnref.data(), bs.exnrefh.data(), fields.sp.at("thl")->fld_mean.data(), fields.sp.at("qt")->fld_mean.data(),
+                bs.pbot, gd.kstart, gd.kend, gd.z.data(), gd.dz.data(), gd.dzh.data());
+
+        // Calculate the compression velocity
+        for (int k=gd.kstart; k<gd.kend; ++k)
+            w_ls[k+1] = bs.rhorefh[k]/bs.rhorefh[k+1] * w_ls[k] - (bs.rhoref[k]-rhoref0[k])/dt * gd.dz[k];
+
+        for (auto& s : fields.st)
+        {
+            compression_expansion_base_state<TF>(
+                    fields.st.at(s.first)->fld.data(), fields.sp.at(s.first)->fld_mean.data(),
+                    w_ls.data(), gd.dzi.data(),
+                    gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
+                    gd.icells, gd.ijcells);
+        }
     }
+
+    if (counter == 0)
+        ++counter;
+    counter %= 3;
+    ++counter;
 
     // extend later for gravity vector not normal to surface
     calc_buoyancy_tend_2nd(fields.mt.at("w")->fld.data(), fields.sp.at("thl")->fld.data(), fields.sp.at("qt")->fld.data(), bs.prefh.data(),
