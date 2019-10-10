@@ -779,10 +779,8 @@ void Thermo_vapor<TF>::exec_stats(Stats<TF>& stats)
     {
         stats.set_prof("phydro" , bs_stats.pref);
         stats.set_prof("phydroh", bs_stats.prefh);
-
-        // CvH this is not the correct rho if the base state is on.
-        stats.set_prof("rho" , fields.rhoref);
-        stats.set_prof("rhoh", fields.rhorefh);
+        stats.set_prof("rho" , bs_stats.rhoref);
+        stats.set_prof("rhoh", bs_stats.rhorefh);
     }
     stats.set_timeseries("zi", gd.z[get_bl_depth()]);
 }
