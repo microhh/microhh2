@@ -910,7 +910,8 @@ void Stats<TF>::add_prof(
         return;
 
     if (std::find(varlist.begin(), varlist.end(), name) != varlist.end())
-        return;
+        throw std::runtime_error("Variable " + name + " already exists.");
+
 
     Level_type level;
     if (zloc == "z")
@@ -1021,7 +1022,7 @@ void Stats<TF>::add_time_series(
         return;
 
     if (std::find(varlist.begin(), varlist.end(), name) != varlist.end())
-        return;
+        throw std::runtime_error("Variable " + name + " already exists.");
 
     // Add the series to all files.
     for (auto& mask : masks)
