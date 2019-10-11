@@ -139,7 +139,9 @@ class Thermo_vapor : public Thermo<TF>
             std::vector<TF> prefh;
             std::vector<TF> exnref;
             std::vector<TF> exnrefh;
-
+            std::vector<TF> rhoref;
+            std::vector<TF> rhorefh;
+            
             // GPU functions and variables
             TF* thl0_g;
             TF* qt0_g;
