@@ -824,7 +824,7 @@ void Thermo_moist<TF>::exec(const double dt, Stats<TF>& stats)
 {
     auto& gd = grid.get_grid_data();
 
-    // Re-calculate hydrostatic pressure and exner, pass dummy as thvref to prevent overwriting base state
+    // Re-calculate hydrostatic pressure and exner.
     auto tmp = fields.get_tmp();
     if (bs.swupdatebasestate)
     {
