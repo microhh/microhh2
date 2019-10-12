@@ -1406,7 +1406,7 @@ void Thermo_moist<TF>::exec_column(Column<TF>& column)
 
 template<typename TF>
 void Thermo_moist<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime)
-{    
+{
     auto& gd = grid.get_grid_data();
 
     #ifndef USECUDA
