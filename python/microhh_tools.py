@@ -13,6 +13,7 @@ import timeit
 import csv
 import copy
 import datetime
+import itertools
 
 # -------------------------
 # General help functions
@@ -93,29 +94,31 @@ class Read_namelist:
         return 'Available groups:\n{}'.format(', '.join(self.groups.keys()))
 
 
-def replace_namelist_value(variable, new_value, namelist_file=None):
-    """ Replace a variables value in an existing namelist """
+def replace_namelist_value(item, new_value, group=None, namelist_file=None):
+    """ Replace a item value in an existing namelist """
     if namelist_file is None:
         namelist_file = _find_namelist_file()
-
     with open(namelist_file, "r") as source:
         lines = source.readlines()
     with open(namelist_file, "w") as source:
+        current_group = None
         for line in lines:
-            source.write(
-                re.sub(
-                    r'({}).*'.format(variable),
-                    r'\1={}'.format(new_value),
-                    line))
+            lstrip = line.strip()
+            if len(lstrip)>0 and lstrip[0] == '[' and lstrip[-1] == ']':
+                current_group = lstrip[1:-1]
+            if group is None or group==current_group:
+                source.write(re.sub(r'({}).*'.format(item), r'\1={}'.format(new_value), line))
+            else:
+                source.write(line)
 
 
-def determine_mode():
+def determine_ntasks():
     namelist = Read_namelist()['master']
 
     npx = namelist['npx'] if 'npx' in namelist.keys() else 1
     npy = namelist['npy'] if 'npy' in namelist.keys() else 1
-    mode = 'serial' if npx * npy == 1 else 'parallel'
-    return mode, npx * npy
+
+    return npx * npy
 
 
 class Read_statistics:
@@ -368,7 +371,7 @@ def run_scripts(scripts):
     def exec_function(lib, function, *args):
         rc = getattr(lib, function)(*args)
 
-        if rc != 0:
+        if (rc is not None) and (rc != 0):
             raise Exception(
                 '{}: {}() returned {}'.format(
                     script, function, rc))
@@ -410,12 +413,10 @@ def restart_pre(origin, timestr):
 
 
 def restart_post(origin, timestr):
-    # Write a real function that compares relevant files between dir1 and dir2
-
-    fnames = glob.glob('*.' + timestr)
-    for file in fnames:
-        if not filecmp.cmp('../' + origin + '/' + file, file):
-            raise Warning(file + ' is not identical')
+    file_names = glob.glob('*.' + timestr)
+    for file_name in file_names:
+        if not filecmp.cmp('../' + origin + '/' + file_name, file_name):
+            raise Warning(file_name + ' is not identical')
 
 
 def compare(origin, file, starttime=-1, vars={}):
@@ -466,7 +467,10 @@ def execute(command):
                 command, sp.returncode))
 
 
-def test_cases(cases, executable, outputfile=''):
+def run_cases(cases, executable, mode, outputfile=''):
+    """
+    Function that iterates over a list of cases and runs all of them
+    """
 
     if not os.path.exists(executable):
         raise Exception(
@@ -479,13 +483,13 @@ def test_cases(cases, executable, outputfile=''):
 
     for case in cases:
         print_header(
-            'Testing case \'{}\' for executable \'{}\''.format(
+            'Running case \'{}\' for executable \'{}\''.format(
                 case.name, executable_rel))
-        # Determine whether to run serial or parallel
 
         # Move to working directory
         rootdir = os.getcwd()
         rundir = rootdir + '/' + case.casedir + '/' + case.rundir + '/'
+
         casedir = rootdir + '/' + case.casedir + '/'
         if case.rundir is not '':
             try:
@@ -501,7 +505,7 @@ def test_cases(cases, executable, outputfile=''):
             except BaseException:
                 print_warning(
                     case.name +
-                    ': Cannot find {} for copying,  skipping case!'.format(
+                    ': Cannot find {} for copying, skipping case!'.format(
                         casedir +
                         fname))
                 os.chdir(rootdir)
@@ -511,51 +515,56 @@ def test_cases(cases, executable, outputfile=''):
 
         try:
             # Update .ini file for testing
-            for variable, value in case.options.items():
+            for group, item, value in case.options:
                 replace_namelist_value(
-                    variable, value, '{0}.ini'.format(
-                        case.name))
-            mode, ntasks = determine_mode()
+                    item, value, group=group, namelist_file='{0}.ini'.format(case.name))
+            ntasks = determine_ntasks()
 
             # Create input data, and do other pre-processing
+            print(case.pre)
             run_scripts(case.pre)
 
             for phase in case.phases:
                 case.time = timeit.default_timer()
-                if mode == 'serial':
+                if mode == 'cpu' or mode == 'gpu':
                     execute('{} {} {}'.format(executable, phase, case.name))
-                elif mode == 'parallel':
-                    execute('mpirun -n {} {} {} {}'.format(ntasks,
-                                                           executable, phase, case.name))
+                elif mode == 'cpumpi':
+                    execute('mpirun --oversubscribe -n {} {} {} {}'.format(
+                        ntasks, executable, phase, case.name))
+                else:
+                    raise ValueError('{} is an illegal value for mode'.format(mode))
+
                 case.time = timeit.default_timer() - case.time
 
             # Run the post-processing steps
             run_scripts(case.post)
             case.success = True
+
         except Exception as e:
             print(str(e))
             print_warning('Case Failed!')
             case.success = False
+
         finally:
             # Go back to root of all cases
             os.chdir(rootdir)
 
     # Write the output file and remove unnecssary dirs
     if outputfile is not '':
-        with open(outputfile, 'w') as csvFile:
-            write = csv.writer(csvFile)
+        with open(outputfile, 'w') as csv_file:
+            write = csv.writer(csv_file)
             write.writerow(['Name', 'Run Dir', 'Success', 'Time', 'Options'])
             for case in cases:
                 write.writerow(
                     [case.name, case.rundir, case.success, case.time, case.options])
-        csvFile.close()
+        csv_file.close()
 
     for case in cases:
         if case.success and not case.keep:
             rundir = rootdir + '/' + case.name + '/' + case.rundir + '/'
             shutil.rmtree(rundir)
 
-
+"""
 def generator_restart(cases):
     cases_out = []
     for case in cases:
@@ -591,9 +600,46 @@ def generator_restart(cases):
         cases_out.append(case_restart)
 
     return cases_out
+"""
+
+def generator_restart(case, experiment, endtime):
+    cases_out = []
+    nl = Read_namelist('{}/{}.ini'.format(case.casedir, case.name))
+
+    iotimeprec = nl['time']['iotimeprec'] if 'iotimeprec' in nl['time'] else 0
+    savetime = endtime/2
+
+    savetime_io = int(round(savetime * 10**(-iotimeprec)))
+    endtime_io = int(round(endtime * 10**(-iotimeprec)))
+
+    endtimestr = '{0:07d}'.format(endtime_io)
+    savetimestr = '{0:07d}'.format(savetime_io)
+
+    case_init = copy.deepcopy(case)
+    case_init.rundir = 'init_{}'.format(experiment)
+
+    case_init.options.append(('time', 'savetime', savetime))
+    case_init.options.append(('time', 'endtime', endtime))
+
+    case_restart = copy.deepcopy(case)
+    case_restart.rundir = 'restart_{}'.format(experiment)
+    case_restart.phases = ['run']
+    case_restart.pre = {__file__: [
+        ['restart_pre', case_init.rundir, savetimestr]]}
+    case_restart.post = {__file__: [
+        ['restart_post', case_init.rundir, endtimestr]]}
+
+    case_restart.options.append(('time', 'starttime', savetime))
+    case_restart.options.append(('time', 'savetime', savetime))
+    case_restart.options.append(('time', 'endtime', endtime))
+
+    cases_out.append(case_init)
+    cases_out.append(case_restart)
+
+    return cases_out
 
 
-def primeFactors(n):
+def prime_factors(n):
     import math
 
     result = []
@@ -625,7 +671,7 @@ def generator_scaling(cases, procs, type='strong', dir='y'):
             elif dir == 'y':
                 option = {'npy': proc}
             elif dir == 'xy':
-                primes = primeFactors(proc)
+                primes = prime_factors(proc)
                 npy = 1
                 npx = 1
                 for i in range(0, len(primes), 2):
@@ -653,7 +699,7 @@ def generator_parameter_change(cases, **kwargs):
             key, value = list(kwargs.items())[0]
             for val in value:
                 new_case = copy.deepcopy(case)
-                new_case.options.update({key: val})
+                new_case.options.update({key : val})
                 new_case.rundir += (key + str(val)).replace('.', '')
 
                 cases_out.append(new_case)
@@ -664,32 +710,73 @@ def generator_parameter_change(cases, **kwargs):
     return cases_out
 
 
+def generator_parameter_permutations(base_case, experiment, lists):
+    """
+    Function to permutate lists of dictionaries to generate cases to run
+    """
+    cases_out = []
+
+    # Convert the dictionaries into tuples to enable to permutate the list.
+    tuple_lists = []
+    for l in lists:
+        tuple_list = []
+        for name, name_dict in l.items():
+            tuple_list.append((name, name_dict))
+        tuple_lists.append(tuple_list)
+
+    # Create permutation of all lists. Each item contains 1 value of each list.
+    lists_permutations = list(itertools.product(*tuple_lists))
+
+    for lp in lists_permutations:
+        case = copy.deepcopy(base_case)
+
+        # Construct the directory name from tuple names.
+        name = ''
+        for name_dict in lp:
+            name += name_dict[0] + '_'
+        case.rundir = name + experiment
+
+        # Unpack all dictonaries and construct a set of tuples.
+        options = []
+        for name_dict in lp:
+            for group, pair in name_dict[1].items():
+                for item, value in pair.items():
+                    options.append((group, item, value))
+
+        case.options = options
+
+        cases_out.append(case)
+
+    return cases_out
+
+
 class Case:
+    """
+    Class that contains a case to run with the required runtime settings
+    """
     def __init__(
             self,
             name,
-            options={},
+            options=[],
             pre={},
             post={},
-            phases=[
-                'init',
-                'run'],
+            phases=['init', 'run'],
             casedir='',
-            rundir='',
+            rundir='default_run',
             files=[],
-            keep=False):
+            keep=True):
 
-        self.name = name        # Case name
-        self.options = options     # Override existing namelist options
+        self.name = name       # Case name
+        self.options = options # List of options to override
         self.pre = pre         # List of pre-processing python scripts
-        self.post = post        # List of post-processing python scripts
-        self.phases = phases      # List of the run phases we have to go through
-        self.casedir = casedir     # Directory of the case; self.name by default
-        self.rundir = rundir      # Relative run directory
-        self.files = files       # List of files necessary to run the case
-        self.success = None        # Whether the entire case was run succesfully or not
-        self.time = None        # Duration of the last phase (usually run)
-        self.keep = keep        # Whether to keep the results of succefull simulations afterwards
+        self.post = post       # List of post-processing python scripts
+        self.phases = phases   # List of the run phases we have to go through
+        self.casedir = casedir # Directory of the case; self.name by default
+        self.rundir = rundir   # Relative run directory, defaults to `default_run`
+        self.files = files     # List of files necessary to run the case
+        self.success = None    # Whether the entire case was run succesfully or not
+        self.time = None       # Duration of the last phase (usually run)
+        self.keep = keep       # Whether to keep the results of succefull simulations afterwards
 
         # By default; run {name}_input.py in preprocessing phase
         self.pre = pre if pre else {'{}_input.py'.format(name): None}
