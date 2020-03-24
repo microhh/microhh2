@@ -49,6 +49,7 @@ template<typename> class Radiation;
 
 template<typename> class Decay;
 template<typename> class Limiter;
+template<typename> class Source;
 
 template<typename> class Stats;
 template<typename> class Budget;
@@ -96,6 +97,7 @@ class Model
 
         std::shared_ptr<Decay<TF>> decay;
         std::shared_ptr<Limiter<TF>> limiter;
+        std::shared_ptr<Source<TF>> source;
 
         std::shared_ptr<Stats<TF>> stats;
         std::shared_ptr<Budget<TF>> budget;

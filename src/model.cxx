@@ -46,6 +46,8 @@
 #include "microphys.h"
 #include "decay.h"
 #include "limiter.h"
+#include "source.h"
+
 #include "stats.h"
 #include "budget.h"
 #include "column.h"
@@ -125,12 +127,13 @@ Model<TF>::Model(Master& masterin, int argc, char *argv[]) :
         microphys = Microphys<TF>::factory(master, *grid, *fields, *input);
         radiation = Radiation<TF>::factory(master, *grid, *fields, *input);
 
-        force     = std::make_shared<Force  <TF>>(master, *grid, *fields, *input);
-        buffer    = std::make_shared<Buffer <TF>>(master, *grid, *fields, *input);
-        decay     = std::make_shared<Decay  <TF>>(master, *grid, *fields, *input);
+        force     = std::make_shared<Force <TF>> (master, *grid, *fields, *input);
+        buffer    = std::make_shared<Buffer<TF>> (master, *grid, *fields, *input);
+        decay     = std::make_shared<Decay<TF>>  (master, *grid, *fields, *input);
         limiter   = std::make_shared<Limiter<TF>>(master, *grid, *fields, *input);
-        ib        = std::make_shared<Immersed_boundary<TF>>(master, *grid, *fields, *input);
+        source    = std::make_shared<Source<TF>> (master, *grid, *fields, *input);
 
+        ib        = std::make_shared<Immersed_boundary<TF>>(master, *grid, *fields, *input);
 
         stats     = std::make_shared<Stats <TF>>(master, *grid, *fields, *advec, *diff, *input);
         column    = std::make_shared<Column<TF>>(master, *grid, *fields, *input);
@@ -186,6 +189,7 @@ void Model<TF>::init()
     radiation->init(timeloop->get_ifactor());
     decay->init(*input);
     budget->init();
+    source->init();
 
     stats->init(timeloop->get_ifactor());
     column->init(timeloop->get_ifactor());
@@ -238,6 +242,7 @@ void Model<TF>::load()
     ib->create();
     buffer->create(*input, *input_nc, *stats);
     force->create(*input, *input_nc, *stats);
+    source->create(*input);
 
     thermo->create(*input, *input_nc, *stats, *column, *cross, *dump);
     thermo->load(timeloop->get_iotime());
@@ -371,6 +376,9 @@ void Model<TF>::exec()
 
                 // Apply the scalar decay.
                 decay->exec(timeloop->get_sub_time_step(), *stats);
+
+                // Add point and line sources of scalars.
+                source->exec();
 
                 // Apply the large scale forcings. Keep this one always right before the pressure.
                 force->exec(timeloop->get_sub_time_step(), *thermo, *stats); //adding thermo and time because of gcssrad
