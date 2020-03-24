@@ -27,6 +27,7 @@
 
 #include "timedep.h"
 #include "boundary_cyclic.h"
+#include "boundary_outflow.h"
 #include "field3d_io.h"
 
 class Master;
@@ -108,6 +109,7 @@ class Boundary
         Fields<TF>& fields;
         Boundary_cyclic<TF> boundary_cyclic;
         Field3d_io<TF> field3d_io;
+        Boundary_outflow<TF> boundary_outflow;
 
         std::string swboundary;
 
@@ -125,6 +127,7 @@ class Boundary
         std::map<std::string, Timedep<TF>*> tdep_bc;
 
         std::vector<std::string> sbot_2d_list;
+        std::vector<std::string> scalar_outflow;
 
         void process_bcs(Input&); ///< Process the boundary condition settings from the ini file.
 
