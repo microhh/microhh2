@@ -93,7 +93,7 @@ Boundary<TF>::Boundary(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsin,
     grid(gridin),
     fields(fieldsin),
     boundary_cyclic(master, grid),
-    boundary_outflow(master, grid)
+    boundary_outflow(master, grid),
     field3d_io(master, grid)
 {
     swboundary = "default";
