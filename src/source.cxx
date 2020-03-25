@@ -1,8 +1,8 @@
 /*
  * MicroHH
- * Copyright (c) 2011-2018 Chiel van Heerwaarden
- * Copyright (c) 2011-2018 Thijs Heus
- * Copyright (c) 2014-2018 Bart van Stratum
+ * Copyright (c) 2011-2020 Chiel van Heerwaarden
+ * Copyright (c) 2011-2020 Thijs Heus
+ * Copyright (c) 2014-2020 Bart van Stratum
  *
  * This file is part of MicroHH
  *
@@ -33,9 +33,9 @@
 
 namespace
 {
-
     template<typename TF>
-    std::vector<int> calc_shape(const TF* restrict x, const TF x0, const TF sigma_x, const TF line_x, int istart, int iend)
+    std::vector<int> calc_shape(
+            const TF* restrict x, const TF x0, const TF sigma_x, const TF line_x, int istart, int iend)
     {
         std::vector<int> range(2);
     
@@ -166,9 +166,9 @@ TF Source<TF>::calc_norm(
     const int jj = gd.icells;
     const int kk = gd.ijcells;
 
-    for (int k = gd.kstart; k < gd.kend; ++k)
-        for (int j = gd.jstart; j < gd.jend; ++j)
-            for (int i = gd.istart; i < gd.iend; ++i)
+    for (int k=gd.kstart; k<gd.kend; ++k)
+        for (int j=gd.jstart; j<gd.jend; ++j)
+            for (int i=gd.istart; i<gd.iend; ++i)
             {
                 const int ijk = i + j*jj + k*kk;
 
@@ -231,9 +231,9 @@ void Source<TF>::calc_source(
 
     const int range[3] = {range_x[1]-range_x[0], range_y[1]-range_y[0], range_z[1]-range_z[0]};
 
-    for(int k = 0; k < range[2]; ++k)
-        for(int j = 0; j < range[1]; ++j)
-            for(int i = 0; i < range[0]; ++i)
+    for(int k = 0; k<range[2]; ++k)
+        for(int j = 0; j<range[1]; ++j)
+            for(int i = 0; i<range[0]; ++i)
             {
                 const int ijk = i + j*range[0] + k*range[0]*range[1];
 
@@ -287,9 +287,9 @@ void Source<TF>::add_source(TF* const restrict st, const TF* const restrict blob
 
     const int range[3] = {range_x[1]-range_x[0], range_y[1]-range_y[0], range_z[1]-range_z[0]};
 
-    for (int k = range_z[0]; k < range_z[1]; ++k)
-        for (int j = range_y[0]; j < range_y[1]; ++j)
-            for (int i = range_x[0]; i < range_x[1]; ++i)
+    for (int k=range_z[0]; k<range_z[1]; ++k)
+        for (int j=range_y[0]; j<range_y[1]; ++j)
+            for (int i=range_x[0]; i<range_x[1]; ++i)
             {
                 if (range_x[0] == range_x[1] || range_y[0] == range_y[1] || range_z[0] == range_z[1])
                     break;
