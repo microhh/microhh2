@@ -29,7 +29,7 @@ namespace
     template<typename TF>
     void compute_outflow_2nd(
             TF* const restrict a,
-            const int iend,
+            const int iend, const int igc,
             const int icells, const int jcells, const int kcells,
             const int ijcells)
     {
@@ -38,16 +38,18 @@ namespace
         // Set the ghost cells using extrapolation.
         for (int k=0; k<kcells; ++k)
             for (int j=0; j<jcells; ++j)
-            {
-                const int ijk = (iend-1) + j*icells + k*ijcells;
-                a[ijk+ii] = a[ijk];
-            }
+                for (int i=0; i<igc; ++i)
+                {
+                    const int ijk    = (iend-1-i) + j*icells + k*ijcells;
+                    const int ijk_gc = (iend+i  ) + j*icells + k*ijcells;
+                    a[ijk_gc] = a[ijk];
+                }
     }
 
     template<typename TF>
     void compute_inflow_2nd(
-            TF* const restrict a, const TF value,
-            const int istart,
+            TF* const restrict a,// const TF value,
+            const int istart, const int igc,
             const int icells, const int jcells, const int kcells,
             const int ijcells)
     {
@@ -56,10 +58,12 @@ namespace
         // Set the ghost cells using extrapolation.
         for (int k=0; k<kcells; ++k)
             for (int j=0; j<jcells; ++j)
-            {
-                const int ijk = istart + j*icells + k*ijcells;
-                a[ijk-ii] = value - a[ijk];
-            }
+                for (int i=0; i<igc; ++i)
+                {
+                    const int ijk    = (istart+i  ) + j*icells + k*ijcells;
+                    const int ijk_gc = (istart-1-i) + j*icells + k*ijcells;
+                    a[ijk_gc] = a[ijk];
+                }
     }
 
     template<typename TF>
@@ -131,7 +135,7 @@ void Boundary_outflow<TF>::exec(TF* const restrict data)
         if (grid.get_spatial_order() == Grid_order::Second)
             compute_outflow_2nd(
                     data,
-                    gd.iend,
+                    gd.iend, gd.igc,
                     gd.icells, gd.jcells, gd.kcells,
                     gd.ijcells);
 
@@ -148,8 +152,8 @@ void Boundary_outflow<TF>::exec(TF* const restrict data)
     {
         if (grid.get_spatial_order() == Grid_order::Second)
             compute_inflow_2nd(
-                    data, TF(0.),
-                    gd.istart,
+                    data,// TF(0.),
+                    gd.istart, gd.igc,
                     gd.icells, gd.jcells, gd.kcells,
                     gd.ijcells);
 
