@@ -1,8 +1,8 @@
 /*
  * MicroHH
- * Copyright (c) 2011-2018 Chiel van Heerwaarden
- * Copyright (c) 2011-2018 Thijs Heus
- * Copyright (c) 2014-2018 Bart van Stratum
+ * Copyright (c) 2011-2020 Chiel van Heerwaarden
+ * Copyright (c) 2011-2020 Thijs Heus
+ * Copyright (c) 2014-2020 Bart van Stratum
  *
  * This file is part of MicroHH
  *
@@ -186,17 +186,20 @@ std::shared_ptr<Field3d<TF>> Fields<TF>::get_tmp_g()
 {
     std::shared_ptr<Field3d<TF>> tmp;
 
-    // In case of insufficient tmp fields, allocate a new one.
-    if (atmp_g.empty())
+    #pragma omp critical
     {
-        init_tmp_field_g();
-        tmp = atmp_g.back();
-        tmp->init_device();
-    }
-    else
-        tmp = atmp_g.back();
+        // In case of insufficient tmp fields, allocate a new one.
+        if (atmp_g.empty())
+        {
+            init_tmp_field_g();
+            tmp = atmp_g.back();
+            tmp->init_device();
+        }
+        else
+            tmp = atmp_g.back();
 
-    atmp_g.pop_back();
+        atmp_g.pop_back();
+    }
 
     // Assign to a huge negative number in case of debug mode.
     #ifdef __CUDACC_DEBUG__
