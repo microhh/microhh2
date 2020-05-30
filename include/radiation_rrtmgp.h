@@ -51,11 +51,13 @@ class Radiation_rrtmgp : public Radiation<TF>
 		bool check_field_exists(std::string name)
         { throw std::runtime_error("Not implemented"); }
 
-        void init(const double);
+        void init(Timeloop<TF>&);
         void create(
                 Input&, Netcdf_handle&, Thermo<TF>&,
                 Stats<TF>&, Column<TF>&, Cross<TF>&, Dump<TF>&);
         void exec(Thermo<TF>&, double, Timeloop<TF>&, Stats<TF>&);
+
+        unsigned long get_time_limit(unsigned long);
 
         void get_radiation_field(Field3d<TF>&, std::string, Thermo<TF>&, Timeloop<TF>&)
         { throw std::runtime_error("Not implemented"); }

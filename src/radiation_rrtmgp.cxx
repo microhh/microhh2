@@ -604,9 +604,20 @@ Radiation_rrtmgp<TF>::Radiation_rrtmgp(
 }
 
 template<typename TF>
-void Radiation_rrtmgp<TF>::init(const double ifactor)
+void Radiation_rrtmgp<TF>::init(Timeloop<TF>& timeloop)
 {
-    idt_rad = static_cast<unsigned long>(ifactor * dt_rad + 0.5);
+    idt_rad = static_cast<unsigned long>(timeloop.get_ifactor() * dt_rad + 0.5);
+
+    // Check if restarttime is dividable by dt_rad
+    if (timeloop.get_isavetime() % idt_rad != 0)
+        throw std::runtime_error("Restart \"savetime\" is not an (integer) multiple of \"dt_rad\"");
+}
+
+template<typename TF>
+unsigned long Radiation_rrtmgp<TF>::get_time_limit(unsigned long itime)
+{
+    unsigned long idtlim = idt_rad - itime % idt_rad;
+    return idtlim;
 }
 
 template<typename TF>
@@ -631,6 +642,13 @@ void Radiation_rrtmgp<TF>::create(
     // Solve the reference column to compute upper boundary conditions.
     create_column(input, input_nc, thermo, stats);
 
+
+    if (stats.get_switch() && sw_shortwave)
+    {
+        const std::string group_name = "radiation";
+        stats.add_time_series("sza", "solar zenith angle", "rad", group_name);
+    }
+
     // Get the allowed cross sections from the cross list
     std::vector<std::string> allowed_crossvars_radiation;
 
@@ -639,7 +657,7 @@ void Radiation_rrtmgp<TF>::create(
         allowed_crossvars_radiation.push_back("sw_flux_up");
         allowed_crossvars_radiation.push_back("sw_flux_dn");
         allowed_crossvars_radiation.push_back("sw_flux_dn_dir");
-        
+
         if (sw_clear_sky_stats)
         {
             allowed_crossvars_radiation.push_back("sw_flux_up_clear");
@@ -951,7 +969,7 @@ void Radiation_rrtmgp<TF>::exec(
 {
     auto& gd = grid.get_grid_data();
 
-    const bool do_radiation = (timeloop.get_itime() % idt_rad == 0);
+    const bool do_radiation = ((timeloop.get_itime() % idt_rad == 0) && !timeloop.in_substep()) ;
 
     if (do_radiation)
     {
@@ -1135,7 +1153,7 @@ void Radiation_rrtmgp<TF>::exec_all_stats(
         if (do_stats || do_cross)
         {
             // Make sure that the top boundary is taken into account in case of fluxes.
-            const int kend = gd.kstart + array.dim(2) + 1;
+            const int kend = gd.kstart + array.dim(2);
             add_ghost_cells(
                     tmp->fld.data(), array.ptr(),
                     gd.istart, gd.iend,
@@ -1206,6 +1224,8 @@ void Radiation_rrtmgp<TF>::exec_all_stats(
             save_stats_and_cross(flux_dn,     "sw_flux_dn_clear"    , gd.wloc);
             save_stats_and_cross(flux_dn_dir, "sw_flux_dn_dir_clear", gd.wloc);
         }
+
+        stats.set_time_series("sza", std::acos(mu0));
     }
 
     fields.release_tmp(tmp);
